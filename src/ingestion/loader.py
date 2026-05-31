@@ -1,0 +1,34 @@
+from pathlib import Path
+from pypdf import PdfReader
+import re
+
+
+def clean_text(text):
+    text = text.replace("\n", " ")
+    text = re.sub(r"-\s*\n\s*", "", text)
+    text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text)
+    text = re.sub(r"\bPage\s*\d+\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
+
+
+def load_pdfs(folder_path):
+    documents = []
+    paths = Path(folder_path).glob("*.pdf")
+
+    for path in paths:
+        try:
+            reader = PdfReader(str(path))
+            pages_text = []
+            for page in reader.pages:
+                page_text = page.extract_text() or ""
+                page_text = clean_text(page_text)
+                if page_text:
+                    pages_text.append(page_text)
+            full_text = " ".join(pages_text).strip()
+            documents.append({"text": full_text, "source": path.name})
+        except Exception as e:
+            print(f"Warning: skipping {path.name} — {e}")
+
+    return documents

@@ -1,0 +1,8 @@
+nltk==3.9.4
+numpy==2.4.6
+ollama==0.6.2
+openai==2.38.0
+pypdf==6.12.2
+scikit-learn==1.8.0
+sentence-transformers==5.5.1
+tiktoken==0.13.0
