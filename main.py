@@ -30,7 +30,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    logging.basicConfig(level=args.log_level, format="%(levelname)s %(name)s — %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
+    for name in ("__main__", "src"):
+        logging.getLogger(name).setLevel(args.log_level)
 
     backend = args.backend or config.LLM_BACKEND
     top_k = args.top_k or config.TOP_K
