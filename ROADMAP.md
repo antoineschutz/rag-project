@@ -54,7 +54,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **A — NumPy + JSON persistence** — save embeddings to `cache/embeddings.npy` and chunk text/metadata to `cache/chunks.json`; on startup load from cache instead of re-embedding; eliminates the re-embedding bottleneck on every run *(Low — NumPy I/O, caching)*
 
 ### V2
-- [ ] **B — Proper logging** — replace all `print()` with Python `logging` module, configurable via `--log-level` *(Low — Python logging)*
+- [x] **B — Proper logging** — replace all `print()` with Python `logging` module, configurable via `--log-level` *(Low — Python logging)*
 - [x] **C — Type hints** — add type annotations to all functions in `src/` *(Low — Python typing)*
 - [ ] **D — SQLite + FAISS** — replace sklearn cosine similarity with FAISS `IndexFlatIP` for ANN search; replace JSON text store with SQLite so individual chunks can be inserted or deleted without rebuilding from scratch *(Medium — Vector indexing, FAISS, SQLite)*
 - [ ] **E — Unit tests** — `tests/` directory with pytest: chunking overlap, embedding shape, retrieval ranking *(Medium — pytest, test design)*
@@ -101,7 +101,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 **Why:** SQLite + FAISS (D) upgrades both stores — FAISS replaces brute-force cosine similarity with proper ANN search, and SQLite replaces the JSON file so chunks can be inserted or deleted individually. Logging (B), type hints (C), and tests (E) add observability and correctness guarantees.
 
 ### Checklist
-- [ ] **B** — Proper logging
+- [x] **B** — Proper logging
 - [x] **C** — Type hints
 - [ ] **D** — SQLite + FAISS
 - [ ] **E** — Unit tests

@@ -1,6 +1,10 @@
-from pathlib import Path
-from pypdf import PdfReader
+import logging
 import re
+from pathlib import Path
+
+from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 
 def clean_text(text: str) -> str:
@@ -29,6 +33,6 @@ def load_pdfs(folder_path: str) -> list[dict[str, str]]:
             full_text = " ".join(pages_text).strip()
             documents.append({"text": full_text, "source": path.name})
         except Exception as e:
-            print(f"Warning: skipping {path.name} — {e}")
+            logger.warning("Skipping %s — %s", path.name, e)
 
     return documents

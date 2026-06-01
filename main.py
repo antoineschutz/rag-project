@@ -1,6 +1,7 @@
 import argparse
-import os
 import json
+import logging
+import os
 
 import numpy as np
 
@@ -13,7 +14,7 @@ from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
 from src.llm.client import LLMClient
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run the RAG pipeline.")
     parser.add_argument("--query", required=True, help="Question to ask the model")
     parser.add_argument("--data-path", default=None, help="Path to PDF data directory")
@@ -21,7 +22,15 @@ def main():
     parser.add_argument("--model", default=None, help="Model name override")
     parser.add_argument("--top-k", type=int, default=None, dest="top_k", help="Number of chunks to retrieve")
     parser.add_argument("--no-rag", action="store_true", help="Skip retrieval; query LLM directly")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Logging verbosity (default: INFO)",
+    )
     args = parser.parse_args()
+
+    logging.basicConfig(level=args.log_level, format="%(levelname)s %(name)s — %(message)s")
 
     backend = args.backend or config.LLM_BACKEND
     top_k = args.top_k or config.TOP_K
@@ -32,7 +41,7 @@ def main():
     if args.no_rag:
         prompt = build_prompt_no_rag(args.query)
         answer = llm.generate(prompt)
-        print("\nANSWER (no RAG):\n")
+        logging.info("ANSWER (no RAG)")
         print(answer)
         return
 
@@ -40,15 +49,13 @@ def main():
     chunks_path = os.path.join(config.CACHE_DIR, "chunks.json")
     embedder = Embedder()
     if os.path.exists(embeddings_path) and os.path.exists(chunks_path):
-        print("Loading embeddings from cache...")
+        logging.info("Loading embeddings from cache...")
         with open(chunks_path) as f:
             chunked_docs = json.load(f)
         doc_embeddings = np.load(embeddings_path)
     else:
         docs = load_pdfs(data_path)
         chunked_docs = chunk_documents(docs)
-
-        
         doc_texts = [d["text"] for d in chunked_docs]
         doc_embeddings = embedder.embed_documents(doc_texts)
 
@@ -56,9 +63,9 @@ def main():
         np.save(embeddings_path, doc_embeddings)
         with open(chunks_path, "w") as f:
             json.dump(chunked_docs, f)
-        print("Embeddings saved to cache.")
+        logging.info("Embeddings saved to cache.")
 
-    retriever = Retriever(chunked_docs, doc_embeddings, verbose=True)
+    retriever = Retriever(chunked_docs, doc_embeddings)
 
     query_embedding = embedder.embed_query(args.query)
     results = retriever.retrieve(query_embedding, top_k=top_k)
