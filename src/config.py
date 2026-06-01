@@ -12,6 +12,8 @@ class RAGConfig:
     OLLAMA_MODEL: str = "phi3"
     OPENAI_MODEL: str = "gpt-4o-mini"
     CACHE_DIR: str = "./cache/"
+    FAISS_INDEX_PATH: str = "./cache/faiss.index"
+    SQLITE_DB_PATH: str = "./cache/chunks.db"
 
 
 config = RAGConfig()
