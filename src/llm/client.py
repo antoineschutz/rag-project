@@ -2,14 +2,14 @@ from src.config import config
 
 
 class LLMClient:
-    def __init__(self, backend=config.LLM_BACKEND, model=None):
+    def __init__(self, backend: str = config.LLM_BACKEND, model: str | None = None) -> None:
         self.backend = backend
         if model is None:
             self.model = config.OPENAI_MODEL if backend == "gpt" else config.OLLAMA_MODEL
         else:
             self.model = model
 
-    def generate(self, prompt):
+    def generate(self, prompt: str) -> str:
         if self.backend == "gpt":
             try:
                 from openai import OpenAI

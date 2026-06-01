@@ -3,7 +3,7 @@ from pypdf import PdfReader
 import re
 
 
-def clean_text(text):
+def clean_text(text: str) -> str:
     text = text.replace("\n", " ")
     text = re.sub(r"-\s*\n\s*", "", text)
     text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text)
@@ -13,7 +13,7 @@ def clean_text(text):
     return text.strip()
 
 
-def load_pdfs(folder_path):
+def load_pdfs(folder_path: str) -> list[dict[str, str]]:
     documents = []
     paths = Path(folder_path).glob("*.pdf")
 

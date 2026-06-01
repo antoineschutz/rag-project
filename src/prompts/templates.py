@@ -1,4 +1,4 @@
-def build_prompt_no_rag(query):
+def build_prompt_no_rag(query: str) -> str:
     return f"""
 Answer the following question:
 
@@ -11,7 +11,7 @@ Answer:
 """
 
 
-def build_prompt_rag(query, contexts):
+def build_prompt_rag(query: str, contexts: list[str]) -> str:
 
     context_text = "\n\n".join(contexts)
 

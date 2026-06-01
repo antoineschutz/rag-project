@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -5,12 +7,12 @@ from src.config import config
 
 
 class Retriever:
-    def __init__(self, chunked_docs, doc_embeddings, verbose=False):
+    def __init__(self, chunked_docs: list[dict[str, str]], doc_embeddings: np.ndarray, verbose: bool = False) -> None:
         self.docs = chunked_docs
         self.embeddings = doc_embeddings
         self.verbose = verbose
 
-    def retrieve(self, query_embedding, top_k=config.TOP_K):
+    def retrieve(self, query_embedding: np.ndarray, top_k: int = config.TOP_K) -> list[dict[str, Any]]:
         similarities = cosine_similarity(query_embedding, self.embeddings)[0]
 
         top_indices = np.argsort(similarities)[-top_k:][::-1]
