@@ -1,6 +1,6 @@
 # RAG Pipeline
 
-A toy from-scratch RAG (Retrieval-Augmented Generation) pipeline — no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
+A from-scratch RAG (Retrieval-Augmented Generation) pipeline — no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
 
 ## Architecture
 
@@ -9,12 +9,12 @@ Data flows linearly through five stages:
 1. **Ingestion** — loads PDFs from `./data/`
 2. **Chunking** — sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens per chunk, 50-token overlap
 3. **Embedding** — `all-MiniLM-L6-v2` via `sentence-transformers`
-4. **Retrieval** — in-memory cosine similarity (sklearn), returns top-k chunks
+4. **Retrieval** — FAISS vector index (exact `IndexFlatIP` or approximate `IndexIVFFlat`) backed by SQLite; sklearn cosine similarity kept as a comparison baseline via `--store numpy`
 5. **Generation** — dispatches to Ollama (local) or OpenAI
 
 ## Setup
 
-**Requirements:** Python 3.9+, [Ollama](https://ollama.com) installed and running locally.
+**Requirements:** Python 3.9+, and either [Ollama](https://ollama.com) running locally or an OpenAI API key.
 
 ```bash
 git clone <repo-url>
@@ -25,9 +25,10 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
 
+# Ollama backend (default)
 ollama pull phi3
 
-# Optional: to use the OpenAI backend, copy .env.example to .env and set OPENAI_API_KEY
+# OpenAI backend: copy .env.example to .env and set OPENAI_API_KEY
 ```
 
 ## Usage
@@ -41,14 +42,30 @@ python main.py --query "What is the difference between RAG-Sequence and RAG-Toke
 # Skip retrieval — query the LLM directly with no context
 python main.py --query "..." --no-rag
 
-# Override backend and model
-python main.py --query "..." --backend gpt --model gpt-4o-mini
+# Use OpenAI instead of Ollama
+python main.py --query "..." --backend gpt
 
-# Retrieve more chunks
-python main.py --query "..." --top-k 5
+# Use FAISS + SQLite backend (default: numpy)
+python main.py --query "..." --store faiss
+
+# Use approximate IVF index (better for large corpora)
+python main.py --query "..." --store faiss --index-type ivf
+
+# See all options
+python main.py --help
 ```
 
 Place PDF files in `./data/` to include them in the knowledge base.
+
+## Storage backends
+
+| Flag | Index | Storage | Best for |
+|------|-------|---------|---------|
+| `--store numpy` (default) | sklearn cosine similarity | `.npy` + `.json` | Baseline comparison, small corpora |
+| `--store faiss` | FAISS `IndexFlatIP` (exact) | `faiss.index` + SQLite | General use, supports incremental updates |
+| `--store faiss --index-type ivf` | FAISS `IndexIVFFlat` (approximate) | `faiss.index` + SQLite | Large corpora (10k+ chunks) |
+
+Cache files are stored in `./cache/`. Delete them to force a full re-embed on the next run.
 
 ## Experiment results
 

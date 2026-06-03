@@ -1,4 +1,5 @@
-faiss-cpu
+faiss-cpu==1.14.2
+pytest
 nltk==3.9.4
 numpy==2.4.6
 ollama==0.6.2

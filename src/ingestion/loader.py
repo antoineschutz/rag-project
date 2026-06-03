@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 def clean_text(text: str) -> str:
-    text = text.replace("\n", " ")
     text = re.sub(r"-\s*\n\s*", "", text)
+    text = text.replace("\n", " ")
     text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text)
     text = re.sub(r"\bPage\s*\d+\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text)
