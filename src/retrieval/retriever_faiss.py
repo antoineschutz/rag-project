@@ -10,15 +10,30 @@ logger = logging.getLogger(__name__)
 
 
 class RetrieverFAISS:
-    def __init__(self, chunked_docs: list[dict[str, str]], doc_embeddings: np.ndarray) -> None:
+    def __init__(
+        self,
+        chunked_docs: list[dict[str, str]],
+        doc_embeddings: np.ndarray,
+        index_type: str = "flat",
+    ) -> None:
         self.docs = chunked_docs
         vectors = doc_embeddings.astype("float32")
         faiss.normalize_L2(vectors)
-        self.index = faiss.IndexFlatIP(vectors.shape[1])
+        dim = vectors.shape[1]
+
+        if index_type == "ivf":
+            nlist = max(1, int(len(vectors) ** 0.5))
+            quantizer = faiss.IndexFlatIP(dim)
+            self.index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
+            self.index.train(vectors)
+            self.index.nprobe = max(1, nlist // 10)
+        else:  # flat
+            self.index = faiss.IndexFlatIP(dim)
+
         self.index.add(vectors)
 
     @classmethod
-    def from_index(cls, chunked_docs: list[dict[str, str]], index: faiss.IndexFlatIP) -> "RetrieverFAISS":
+    def from_index(cls, chunked_docs: list[dict[str, str]], index: faiss.Index) -> "RetrieverFAISS":
         obj = cls.__new__(cls)
         obj.docs = chunked_docs
         obj.index = index

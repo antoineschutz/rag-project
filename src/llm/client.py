@@ -40,3 +40,6 @@ class LLMClient:
                 raise RuntimeError(
                     f"Ollama request failed — is Ollama running with model '{self.model}' pulled? ({e})"
                 ) from e
+
+        else:
+            raise ValueError(f"Unknown backend: '{self.backend}'. Choose 'ollama' or 'gpt'.")

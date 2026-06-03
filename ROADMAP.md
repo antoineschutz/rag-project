@@ -56,7 +56,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 ### V2
 - [x] **B — Proper logging** — replace all `print()` with Python `logging` module, configurable via `--log-level` *(Low — Python logging)*
 - [x] **C — Type hints** — add type annotations to all functions in `src/` *(Low — Python typing)*
-- [ ] **D — SQLite + FAISS** — replace sklearn cosine similarity with FAISS `IndexFlatIP` for ANN search; replace JSON text store with SQLite so individual chunks can be inserted or deleted without rebuilding from scratch *(Medium — Vector indexing, FAISS, SQLite)*
+- [x] **D — SQLite + FAISS** — replace sklearn cosine similarity with FAISS `IndexFlatIP` for ANN search; replace JSON text store with SQLite so individual chunks can be inserted or deleted without rebuilding from scratch *(Medium — Vector indexing, FAISS, SQLite)*
 - [ ] **E — Unit tests** — `tests/` directory with pytest: chunking overlap, embedding shape, retrieval ranking *(Medium — pytest, test design)*
 
 ### V3
@@ -103,7 +103,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 ### Checklist
 - [x] **B** — Proper logging
 - [x] **C** — Type hints
-- [ ] **D** — SQLite + FAISS
+- [x] **D** — SQLite + FAISS
 - [ ] **E** — Unit tests
 
 ---

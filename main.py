@@ -1,19 +1,13 @@
 import argparse
-import json
 import logging
-import os
-
-import numpy as np
 
 from src.config import config
-from src.ingestion.loader import load_pdfs
-from src.chunking.chunk import chunk_documents
 from src.embeddings.embed import Embedder
-from src.retrieval.retriever import Retriever
-from src.retrieval.retriever_faiss import RetrieverFAISS
-from src.store.sqlite_store import ChunkStore
+from src.retrieval.factory import build_retriever
 from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
 from src.llm.client import LLMClient
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -36,6 +30,13 @@ def main() -> None:
         default="numpy",
         help="Storage and retrieval backend (default: numpy)",
     )
+    parser.add_argument(
+        "--index-type",
+        choices=["flat", "ivf"],
+        default="flat",
+        dest="index_type",
+        help="FAISS index type, only applies with --store faiss (default: flat)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
@@ -51,47 +52,12 @@ def main() -> None:
     if args.no_rag:
         prompt = build_prompt_no_rag(args.query)
         answer = llm.generate(prompt)
-        logging.info("ANSWER (no RAG)")
+        print("ANSWER (no RAG)")
         print(answer)
         return
 
     embedder = Embedder()
-    os.makedirs(config.CACHE_DIR, exist_ok=True)
-
-    if args.store == "numpy":
-        embeddings_path = os.path.join(config.CACHE_DIR, "embeddings.npy")
-        chunks_path = os.path.join(config.CACHE_DIR, "chunks.json")
-        if os.path.exists(embeddings_path) and os.path.exists(chunks_path):
-            logging.info("Loading from numpy cache...")
-            with open(chunks_path) as f:
-                chunked_docs = json.load(f)
-            doc_embeddings = np.load(embeddings_path)
-        else:
-            docs = load_pdfs(data_path)
-            chunked_docs = chunk_documents(docs)
-            doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
-            np.save(embeddings_path, doc_embeddings)
-            with open(chunks_path, "w") as f:
-                json.dump(chunked_docs, f)
-            logging.info("Embeddings saved to numpy cache.")
-        retriever = Retriever(chunked_docs, doc_embeddings)
-
-    else:  # faiss
-        import faiss
-        store = ChunkStore(config.SQLITE_DB_PATH)
-        if os.path.exists(config.FAISS_INDEX_PATH) and store.exists():
-            logging.info("Loading from FAISS + SQLite cache...")
-            chunked_docs = store.load()
-            index = faiss.read_index(config.FAISS_INDEX_PATH)
-            retriever = RetrieverFAISS.from_index(chunked_docs, index)
-        else:
-            docs = load_pdfs(data_path)
-            chunked_docs = chunk_documents(docs)
-            doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
-            store.save(chunked_docs)
-            retriever = RetrieverFAISS(chunked_docs, doc_embeddings)
-            faiss.write_index(retriever.index, config.FAISS_INDEX_PATH)
-            logging.info("Embeddings saved to FAISS + SQLite cache.")
+    retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
 
     query_embedding = embedder.embed_query(args.query)
     results = retriever.retrieve(query_embedding, top_k=top_k)
