@@ -53,6 +53,6 @@ class RetrieverFAISS:
                 "source": self.docs[idx]["source"],
                 "score": float(score),
             })
-            logger.debug("%.4f | %s | %d chars", score, self.docs[idx]["text"], len(self.docs[idx]["text"]))
+            logger.debug("%.4f | [%s] %s", score, self.docs[idx]["source"], self.docs[idx]["text"])
 
         return results

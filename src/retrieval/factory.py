@@ -7,7 +7,7 @@ import numpy as np
 
 from src.config import config
 from src.embeddings.embed import Embedder
-from src.ingestion.loader import load_pdfs
+from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
 from src.retrieval.retriever import Retriever
 from src.retrieval.retriever_faiss import RetrieverFAISS
@@ -31,7 +31,7 @@ def build_retriever(
                 chunked_docs = json.load(f)
             doc_embeddings = np.load(config.EMBEDDINGS_PATH)
         else:
-            docs = load_pdfs(data_path)
+            docs = load_documents(data_path)
             chunked_docs = chunk_documents(docs)
             doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
             np.save(config.EMBEDDINGS_PATH, doc_embeddings)
@@ -48,7 +48,7 @@ def build_retriever(
             index = faiss.read_index(config.FAISS_INDEX_PATH)
             return RetrieverFAISS.from_index(chunked_docs, index)
         else:
-            docs = load_pdfs(data_path)
+            docs = load_documents(data_path)
             chunked_docs = chunk_documents(docs)
             doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
             chunk_store.save(chunked_docs)

@@ -53,14 +53,14 @@ Atomic improvements that can be combined into future versions. Check off each it
 ### V1 (done)
 - [x] **A — NumPy + JSON persistence** — save embeddings to `cache/embeddings.npy` and chunk text/metadata to `cache/chunks.json`; on startup load from cache instead of re-embedding; eliminates the re-embedding bottleneck on every run *(Low — NumPy I/O, caching)*
 
-### V2
+### V2 (done)
 - [x] **B — Proper logging** — replace all `print()` with Python `logging` module, configurable via `--log-level` *(Low — Python logging)*
 - [x] **C — Type hints** — add type annotations to all functions in `src/` *(Low — Python typing)*
 - [x] **D — SQLite + FAISS** — replace sklearn cosine similarity with FAISS `IndexFlatIP` for ANN search; replace JSON text store with SQLite so individual chunks can be inserted or deleted without rebuilding from scratch *(Medium — Vector indexing, FAISS, SQLite)*
-- [ ] **E — Unit tests** — `tests/` directory with pytest: chunking overlap, embedding shape, retrieval ranking *(Medium — pytest, test design)*
+- [x] **E — Unit tests** — `tests/` directory with pytest: chunking overlap, embedding shape, retrieval ranking *(Medium — pytest, test design)*
 
 ### V3
-- [ ] **F — Multiple file types** — support `.txt`, `.md`, `.docx` ingestion alongside PDF *(Low — File I/O)*
+- [x] **F — Multiple file types** — support `.txt`, `.md`, `.docx` ingestion alongside PDF *(Low — File I/O)*
 - [ ] **G — Extraction test data** — (a) create a synthetic hand-crafted PDF (`tests/fixtures/extraction_test.pdf`) containing a table with known cell values, a two-column section, and labelled headers; write pytest assertions that exact expected text/table content is extracted; (b) annotate key sections of `data/rag_lewis2020.pdf` with expected extraction output and write integration-level assertions *(Low — Test fixtures, pytest, ground-truth annotation)*
 - [ ] **H — Better PDF extraction** — replace pypdf's basic `page.extract_text()` with `pdfplumber` for layout-aware extraction: detect and preserve multi-column reading order, extract tables as Markdown, retain section headers as labelled elements; update `src/ingestion/loader.py` *(Medium — PDF parsing, layout analysis, pdfplumber)*
 
@@ -94,7 +94,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 ---
 
-## V2 — Persistent & observable
+## V2 — Persistent & observable (done)
 
 **Theme:** Stop re-computing everything on every run; add observability.
 
@@ -104,7 +104,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **B** — Proper logging
 - [x] **C** — Type hints
 - [x] **D** — SQLite + FAISS
-- [ ] **E** — Unit tests
+- [x] **E** — Unit tests
 
 ---
 

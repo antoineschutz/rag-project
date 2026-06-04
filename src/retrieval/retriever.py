@@ -27,6 +27,6 @@ class Retriever:
             })
 
         for r in results:
-            logger.debug("%.4f | %s | %d chars", r["score"], r["text"], len(r["text"]))
+            logger.debug("%.4f | [%s] %s", r["score"], r["source"], r["text"])
 
         return results
