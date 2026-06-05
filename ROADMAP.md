@@ -66,7 +66,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **AB — Docstrings** — add one-line docstrings to all public functions *(Low — Documentation habit)*
 
 ### V4
-- [ ] **I — HyDE (Hypothetical Document Embeddings)** — before embedding a query, prompt the LLM to generate a hypothetical answer passage and embed that instead of the raw query string; improves recall for short or ambiguous queries with no index changes; requires the LLM to be available at query time *(Low — Query augmentation, retrieval quality)*
+- [x] **I — HyDE (Hypothetical Document Embeddings)** — before embedding a query, prompt the LLM to generate a hypothetical answer passage and embed that instead of the raw query string; improves recall for short or ambiguous queries with no index changes; requires the LLM to be available at query time *(Low — Query augmentation, retrieval quality)*
 - [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
 - [ ] **K — BM25 retrieval** — add `rank_bm25` as a second retrieval method alongside cosine similarity *(Medium — Sparse retrieval, lexical search)*
 - [ ] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
@@ -126,7 +126,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 **Why:** Qdrant (J) collapses the dual-store (FAISS index + SQLite) into a single service with built-in persistence, CRUD, and metadata filtering. BM25 (K), hybrid search (L), re-ranking (M), and chunking ablations (N) then build the full modern retrieval stack on top of it.
 
 ### Checklist
-- [ ] **I** — HyDE
+- [x] **I** — HyDE
 - [ ] **J** — Qdrant vector database
 - [ ] **K** — BM25 retrieval
 - [ ] **L** — Hybrid retrieval

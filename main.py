@@ -37,6 +37,11 @@ def main() -> None:
         dest="index_type",
         help="FAISS index type, only applies with --store faiss (default: flat)",
     )
+    parser.add_argument(
+        "--hyde",
+        action="store_true",
+        help="Use HyDE: embed a hypothetical answer passage instead of the raw query",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
@@ -59,7 +64,13 @@ def main() -> None:
     embedder = Embedder()
     retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
 
-    query_embedding = embedder.embed_query(args.query)
+    if args.hyde:
+        from src.hyde.hyde import generate_hypothetical_doc
+        embed_input = generate_hypothetical_doc(args.query, llm)
+    else:
+        embed_input = args.query
+
+    query_embedding = embedder.embed_query(embed_input)
     results = retriever.retrieve(query_embedding, top_k=top_k)
 
     contexts = [r["text"] for r in results]
