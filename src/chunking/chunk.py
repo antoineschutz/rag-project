@@ -9,6 +9,7 @@ nltk.download("punkt_tab", quiet=True)
 
 
 def naive_chunk_text(text: str, chunk_size: int = 500, overlap: int = 20) -> list[str]:
+    """Split text into fixed-size character chunks with overlap."""
     chunks = []
     start = 0
     while start < len(text):
@@ -19,6 +20,7 @@ def naive_chunk_text(text: str, chunk_size: int = 500, overlap: int = 20) -> lis
 
 
 def chunk_text(text: str, chunk_size: int = 500, min_chunk_size: int = 300) -> list[str]:
+    """Split text into sentence-aware chunks bounded by character count."""
     sentences = sent_tokenize(text)
     chunks = []
     current = []
@@ -50,6 +52,7 @@ def chunk_text_tiktoken(
     max_tokens: int = config.CHUNK_MAX_TOKENS,
     overlap_tokens: int = config.CHUNK_OVERLAP,
 ) -> list[str]:
+    """Like chunk_text but uses tiktoken token counts instead of character counts, with overlap carry-over between chunks."""
     enc = tiktoken.get_encoding("cl100k_base")
 
     def token_len(text: str) -> int:
@@ -94,6 +97,7 @@ def chunk_text_tiktoken(
 
 
 def chunk_documents(docs: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Apply tiktoken chunking to each document, propagating the source field to every chunk."""
     chunked_docs = []
     for doc in docs:
         for chunk in chunk_text_tiktoken(doc["text"]):

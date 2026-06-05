@@ -22,6 +22,7 @@ def build_retriever(
     embedder: Embedder,
     index_type: str = "flat",
 ) -> Retriever | RetrieverFAISS:
+    """Build and return a retriever, loading embeddings from cache or ingesting from scratch."""
     os.makedirs(config.CACHE_DIR, exist_ok=True)
 
     if store == "numpy":

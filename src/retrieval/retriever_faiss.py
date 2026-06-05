@@ -16,6 +16,7 @@ class RetrieverFAISS:
         doc_embeddings: np.ndarray,
         index_type: str = "flat",
     ) -> None:
+        """Build a FAISS index (flat or IVF) from chunk embeddings and store the docs."""
         self.docs = chunked_docs
         vectors = doc_embeddings.astype("float32")
         faiss.normalize_L2(vectors)
@@ -34,12 +35,14 @@ class RetrieverFAISS:
 
     @classmethod
     def from_index(cls, chunked_docs: list[dict[str, str]], index: faiss.Index) -> "RetrieverFAISS":
+        """Construct a RetrieverFAISS from an already-loaded FAISS index, bypassing __init__."""
         obj = cls.__new__(cls)
         obj.docs = chunked_docs
         obj.index = index
         return obj
 
     def retrieve(self, query_embedding: np.ndarray, top_k: int = config.TOP_K) -> list[dict[str, Any]]:
+        """Return the top_k chunks most similar to query_embedding using the FAISS index."""
         query = np.array(query_embedding, dtype="float32")
         if query.ndim == 1:
             query = query.reshape(1, -1)

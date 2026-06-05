@@ -1,10 +1,11 @@
 faiss-cpu==1.14.2
-pytest
+pytest==9.0.3
 nltk==3.9.4
 numpy==2.4.6
 ollama==0.6.2
 openai==2.38.0
 pypdf==6.12.2
+pdfplumber==0.11.9
 python-docx==1.2.0
 scikit-learn==1.8.0
 sentence-transformers==5.5.1

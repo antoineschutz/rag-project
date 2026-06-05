@@ -33,7 +33,6 @@ def test_pdf_prose_chunk():
     assert _any_chunk_contains(rag_chunks, "document encoder", "query encoder")
 
 
-@pytest.mark.xfail(reason="requires pdfplumber (H)")
 def test_pdf_table_chunk():
     # Q20: "What BLEU score did ConvS2S Ensemble achieve on WMT 2014 EN-FR?" → 41.29
     chunks = chunk_documents(load_pdfs("data"))
@@ -41,9 +40,9 @@ def test_pdf_table_chunk():
     assert _any_chunk_contains(aiayn_chunks, "ConvS2S Ensemble", "41.29")
 
 
-@pytest.mark.xfail(reason="requires pdfplumber (H)")
-def test_pdf_column_order_chunk():
-    # Q25: "How many attention heads and what model dimension does the Transformer base use?" → d_model=512
+def test_pdf_table_markdown():
+    # Q25-adjacent: Transformer base model (Table 3, bordered → pdfplumber extracts as Markdown)
+    # "| 6 512 2048 8 ..." proves the table row survived as structured Markdown, not raw text
     chunks = chunk_documents(load_pdfs("data"))
     aiayn_chunks = [c for c in chunks if c["source"] == "attention_is_all_you_need.pdf"]
-    assert _any_chunk_contains(aiayn_chunks, "d_model", "512")
+    assert _any_chunk_contains(aiayn_chunks, "| 6 512", "2048")

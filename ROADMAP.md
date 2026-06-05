@@ -62,7 +62,8 @@ Atomic improvements that can be combined into future versions. Check off each it
 ### V3
 - [x] **F — Multiple file types** — support `.txt`, `.md`, `.docx` ingestion alongside PDF *(Low — File I/O)*
 - [x] **G — Extraction test data** — (a) create a synthetic hand-crafted PDF (`tests/fixtures/extraction_test.pdf`) containing a table with known cell values, a two-column section, and labelled headers; write pytest assertions that exact expected text/table content is extracted; (b) annotate key sections of `data/rag_lewis2020.pdf` with expected extraction output and write integration-level assertions *(Low — Test fixtures, pytest, ground-truth annotation)*
-- [ ] **H — Better PDF extraction** — replace pypdf's basic `page.extract_text()` with `pdfplumber` for layout-aware extraction: detect and preserve multi-column reading order, extract tables as Markdown, retain section headers as labelled elements; update `src/ingestion/loader.py` *(Medium — PDF parsing, layout analysis, pdfplumber)*
+- [x] **H — Better PDF extraction** — replace pypdf's basic `page.extract_text()` with `pdfplumber` for layout-aware extraction: detect and preserve multi-column reading order, extract tables as Markdown, retain section headers as labelled elements; update `src/ingestion/loader.py` *(Medium — PDF parsing, layout analysis, pdfplumber)*
+- [x] **AB — Docstrings** — add one-line docstrings to all public functions *(Low — Documentation habit)*
 
 ### V4
 - [ ] **I — HyDE (Hypothetical Document Embeddings)** — before embedding a query, prompt the LLM to generate a hypothetical answer passage and embed that instead of the raw query string; improves recall for short or ambiguous queries with no index changes; requires the LLM to be available at query time *(Low — Query augmentation, retrieval quality)*
@@ -73,10 +74,9 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [ ] **N — Chunking strategy comparison** — run a fixed eval set across naive/sentence/tiktoken chunkers and log scores *(Medium — Ablation studies)*
 
 ### V5
-- [ ] **O — RAG vs no-RAG evaluation** — run both RAG and no-RAG paths on a fixed question set and compare answers side-by-side with a relevance metric; replaces the removed always-on dual-path with a proper offline evaluation harness *(Low — evaluation, baselines)*
 - [ ] **P — Streaming LLM output** — stream Ollama/OpenAI tokens to stdout instead of waiting for full response *(Low — Generator patterns, streaming APIs)*
 - [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking *(Low — Metadata, search filters)*
-- [ ] **R — Evaluation framework** — compare RAG vs no-RAG on a fixed question set with relevance metrics *(Medium — RAG evaluation, metrics)*
+- [ ] **R — Evaluation framework** — run RAG and no-RAG on a fixed set of question-answer pairs, score each answer for correctness, and report results side-by-side *(Medium — RAG evaluation, metrics)*
 - [ ] **S — FastAPI server** — expose four endpoints: `POST /upload` (ingest a document), `POST /query` (run the RAG pipeline and return JSON), `POST /evaluate` (run a fixed question set and return metrics), `POST /compare` (run the same query across two configs and return both results side-by-side) *(Medium — REST APIs, async Python)*
 - [ ] **T — Conversation memory** — maintain chat history so follow-up questions work in context *(Medium — Stateful pipelines)*
 - [ ] **U — Streamlit dashboard** — web UI to run queries live, display retrieved chunks, compare RAG vs no-RAG side-by-side, and visualise evaluation metrics (latency, faithfulness, retrieval scores) *(Medium — Streamlit, frontend ML tools)*
@@ -88,9 +88,6 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [ ] **Y — MLflow experiment tracking** — log each run's parameters (embedding model, chunk size, retrieval method) and metrics (retrieval score, faithfulness, latency) to MLflow so experiments from N, X, and R are comparable in a single UI *(Medium — MLflow, experiment tracking)*
 - [ ] **Z — RAGAS evaluation** — plug in the `ragas` library for context precision/recall/faithfulness metrics *(High — RAG evaluation science)*
 - [ ] **AA — Async pipeline** — `asyncio`-based ingestion and embedding for parallel processing *(High — Async Python)*
-
-### Unassigned
-- [ ] **AB — Docstrings** — add one-line docstrings to all public functions *(Low — Documentation habit)*
 
 ---
 
@@ -108,16 +105,17 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 ---
 
-## V3 — Better extraction
+## V3 — Better extraction (done)
 
 **Theme:** Fix the data layer before improving retrieval.
 
 **Why:** The current pypdf extractor loses multi-column layout, tables, and section headers — noise that degrades every downstream step. Cleaning extraction and broadening ingest file types here means V4 (retrieval) operates on significantly better input.
 
 ### Checklist
-- [ ] **F** — Multiple file types
-- [ ] **G** — Extraction test data
-- [ ] **H** — Better PDF extraction
+- [x] **F** — Multiple file types
+- [x] **G** — Extraction test data
+- [x] **H** — Better PDF extraction
+- [x] **AB** — Docstrings
 
 ---
 
@@ -141,10 +139,9 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 **Theme:** Turn the script into a real service you can benchmark and demo.
 
-**Why:** Once retrieval quality is established (V4), build the interface around it. Evaluation (R) gives a quantitative story; FastAPI (S) makes it demo-able; streaming (P) makes it feel live; memory (T) makes it useful as a chatbot.
+**Why:** Once retrieval quality is established (V4), build the interface around it. Evaluation (R) gives a quantitative story; FastAPI (S) makes it demo-able; streaming (P) makes it feel live; memory (T) makes it useful as a chatbot. Metadata filtering (Q) enables scoped retrieval over specific documents.
 
 ### Checklist
-- [ ] **O** — RAG vs no-RAG evaluation
 - [ ] **P** — Streaming LLM output
 - [ ] **Q** — Metadata filtering
 - [ ] **R** — Evaluation framework

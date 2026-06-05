@@ -3,9 +3,11 @@ import sqlite3
 
 class ChunkStore:
     def __init__(self, db_path: str) -> None:
+        """Set the SQLite database path."""
         self.db_path = db_path
 
     def exists(self) -> bool:
+        """Return True if the chunks table exists and contains at least one row."""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("SELECT 1 FROM chunks LIMIT 1")
@@ -14,6 +16,7 @@ class ChunkStore:
             return False
 
     def save(self, chunks: list[dict[str, str]]) -> None:
+        """Drop and recreate the chunks table, then insert all chunks."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DROP TABLE IF EXISTS chunks")
             conn.execute(
@@ -25,6 +28,7 @@ class ChunkStore:
             )
 
     def load(self) -> list[dict[str, str]]:
+        """Load all chunks from SQLite ordered by insertion id."""
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 "SELECT text, source FROM chunks ORDER BY id"

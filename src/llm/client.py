@@ -3,6 +3,7 @@ from src.config import config
 
 class LLMClient:
     def __init__(self, backend: str = config.LLM_BACKEND, model: str | None = None) -> None:
+        """Set the LLM backend (ollama or gpt) and resolve the model name from config if not given."""
         self.backend = backend
         if model is None:
             self.model = config.OPENAI_MODEL if backend == "gpt" else config.OLLAMA_MODEL
@@ -10,6 +11,7 @@ class LLMClient:
             self.model = model
 
     def generate(self, prompt: str) -> str:
+        """Send prompt to the configured LLM backend and return the response string."""
         if self.backend == "gpt":
             try:
                 from openai import OpenAI
