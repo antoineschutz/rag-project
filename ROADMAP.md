@@ -71,12 +71,11 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [ ] **K — BM25 retrieval** — add `rank_bm25` as a second retrieval method alongside cosine similarity *(Medium — Sparse retrieval, lexical search)*
 - [ ] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
 - [ ] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
-- [ ] **N — Chunking strategy comparison** — run a fixed eval set across naive/sentence/tiktoken chunkers and log scores *(Medium — Ablation studies)*
-
 ### V5
 - [ ] **P — Streaming LLM output** — stream Ollama/OpenAI tokens to stdout instead of waiting for full response *(Low — Generator patterns, streaming APIs)*
-- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking *(Low — Metadata, search filters)*
+- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking *(Low if J is done, Medium otherwise — Metadata, search filters)*
 - [ ] **R — Evaluation framework** — run RAG and no-RAG on a fixed set of question-answer pairs, score each answer for correctness, and report results side-by-side *(Medium — RAG evaluation, metrics)*
+- [ ] **N — Chunking strategy comparison** — run the eval set from R across naive/sentence/tiktoken chunkers and log scores; requires R *(Medium — Ablation studies)*
 - [ ] **S — FastAPI server** — expose four endpoints: `POST /upload` (ingest a document), `POST /query` (run the RAG pipeline and return JSON), `POST /evaluate` (run a fixed question set and return metrics), `POST /compare` (run the same query across two configs and return both results side-by-side) *(Medium — REST APIs, async Python)*
 - [ ] **T — Conversation memory** — maintain chat history so follow-up questions work in context *(Medium — Stateful pipelines)*
 - [ ] **U — Streamlit dashboard** — web UI to run queries live, display retrieved chunks, compare RAG vs no-RAG side-by-side, and visualise evaluation metrics (latency, faithfulness, retrieval scores) *(Medium — Streamlit, frontend ML tools)*
@@ -123,7 +122,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 **Theme:** Replace naive cosine similarity with a state-of-the-art retrieval stack.
 
-**Why:** Qdrant (J) collapses the dual-store (FAISS index + SQLite) into a single service with built-in persistence, CRUD, and metadata filtering. BM25 (K), hybrid search (L), re-ranking (M), and chunking ablations (N) then build the full modern retrieval stack on top of it.
+**Why:** BM25 (K), hybrid search (L), and re-ranking (M) are independent retrieval improvements that work on top of the existing FAISS + SQLite stack. Qdrant (J) is an optional infrastructure upgrade that collapses the dual-store into a single service with built-in persistence, CRUD, and metadata filtering — useful but not a prerequisite for K/L/M. Chunking ablations (N) moved to V5 because they require the evaluation framework (R) to be meaningful.
 
 ### Checklist
 - [x] **I** — HyDE
@@ -131,7 +130,6 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [ ] **K** — BM25 retrieval
 - [ ] **L** — Hybrid retrieval
 - [ ] **M** — Re-ranking
-- [ ] **N** — Chunking strategy comparison
 
 ---
 
@@ -145,6 +143,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [ ] **P** — Streaming LLM output
 - [ ] **Q** — Metadata filtering
 - [ ] **R** — Evaluation framework
+- [ ] **N** — Chunking strategy comparison (requires R)
 - [ ] **S** — FastAPI server
 - [ ] **T** — Conversation memory
 - [ ] **U** — Streamlit dashboard

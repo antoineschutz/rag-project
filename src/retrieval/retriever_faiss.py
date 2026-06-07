@@ -51,6 +51,8 @@ class RetrieverFAISS:
 
         results = []
         for score, idx in zip(scores[0], indices[0]):
+            if idx < 0:
+                continue
             results.append({
                 "text": self.docs[idx]["text"],
                 "source": self.docs[idx]["source"],

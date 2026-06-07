@@ -39,15 +39,15 @@ def _word_in_bbox(word: dict, bbox: tuple) -> bool:
     return x0 <= x_center <= x1 and top <= y_center <= bottom
 
 
-def _words_to_text(words: list[dict]) -> str:
-    """Reconstruct paragraph text from word dicts, grouping characters sharing a baseline into lines."""
+def _words_to_text(words: list[dict]) -> list[tuple[int, str]]:
+    """Reconstruct paragraph text from word dicts; returns (top_bucket, line_text) pairs sorted by top position."""
     if not words:
-        return ""
+        return []
     lines: dict[int, list[str]] = {}
     for w in words:
         key = round(w["top"] / 3) * 3
         lines.setdefault(key, []).append(w["text"])
-    return "\n".join(" ".join(lines[k]) for k in sorted(lines))
+    return [(k, " ".join(lines[k])) for k in sorted(lines)]
 
 
 def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
@@ -70,25 +70,27 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
         if two_column:
             left = sorted([w for w in body_words if (w["x0"] + w["x1"]) / 2 < midpoint], key=lambda w: (w["top"], w["x0"]))
             right = sorted([w for w in body_words if (w["x0"] + w["x1"]) / 2 >= midpoint], key=lambda w: (w["top"], w["x0"]))
-            body_text = _words_to_text(left) + "\n" + _words_to_text(right)
+            keyed_lines = _words_to_text(left) + _words_to_text(right)
         else:
             body_words_sorted = sorted(body_words, key=lambda w: (w["top"], w["x0"]))
-            body_text = _words_to_text(body_words_sorted)
+            keyed_lines = _words_to_text(body_words_sorted)
 
-        # Phase 3: header labelling
+        # Phase 3: header labelling — match chars by y-position bucket, not text substring
         non_table_chars = [c for c in page.chars if not any(_word_in_bbox(c, bb) for bb in table_bboxes)]
         if non_table_chars:
             sizes = [c["size"] for c in non_table_chars if c.get("size")]
             median_size = statistics.median(sizes) if sizes else 0
             labelled_lines = []
-            for line in body_text.splitlines():
-                line_chars = [c for c in non_table_chars if c["text"].strip() and c["text"] in line]
+            for top_key, line in keyed_lines:
+                line_chars = [c for c in non_table_chars if abs(round(c["top"] / 3) * 3 - top_key) <= 3]
                 avg_size = statistics.mean(c["size"] for c in line_chars) if line_chars else 0
                 if avg_size >= median_size * 1.3 and 0 < len(line) < 80:
                     labelled_lines.append("## " + line)
                 else:
                     labelled_lines.append(line)
             body_text = "\n".join(labelled_lines)
+        else:
+            body_text = "\n".join(line for _, line in keyed_lines)
 
         body_text = re.sub(r"-\s*\n\s*", "", body_text)
         body_text = re.sub(r"\bPage\s*\d+\b", " ", body_text, flags=re.IGNORECASE)

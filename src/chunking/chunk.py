@@ -75,6 +75,10 @@ def chunk_text_tiktoken(
             for i in range(0, len(tokens), max_tokens):
                 chunk_tokens = tokens[i:i + max_tokens]
                 chunks.append(enc.decode(chunk_tokens))
+            if overlap_tokens > 0 and tokens:
+                overlap = tokens[-overlap_tokens:]
+                current_chunk = [enc.decode(overlap)]
+                current_tokens = len(overlap)
             continue
 
         if current_tokens + sentence_tokens > max_tokens:

@@ -24,7 +24,7 @@ class LLMClient:
                     ],
                     temperature=0
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content or ""
             except Exception as e:
                 raise RuntimeError(
                     f"OpenAI request failed — check that OPENAI_API_KEY is set correctly. ({e})"
