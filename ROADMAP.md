@@ -71,21 +71,24 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
 - [x] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
 ### V5
-- [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
-- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking; straightforward with Qdrant payload filters, awkward without it *(Low — Metadata, search filters)*
-- [ ] **P — Streaming LLM output** — stream Ollama/OpenAI tokens to stdout instead of waiting for full response *(Low — Generator patterns, streaming APIs)*
-- [ ] **R — Evaluation framework** — run RAG and no-RAG on a fixed set of question-answer pairs, score each answer for correctness, and report results side-by-side *(Medium — RAG evaluation, metrics)*
-- [ ] **N — Chunking strategy comparison** — run the eval set from R across naive/sentence/tiktoken chunkers and log scores; requires R *(Medium — Ablation studies)*
-- [ ] **S — FastAPI server** — expose four endpoints: `POST /upload` (ingest a document), `POST /query` (run the RAG pipeline and return JSON), `POST /evaluate` (run a fixed question set and return metrics), `POST /compare` (run the same query across two configs and return both results side-by-side) *(Medium — REST APIs, async Python)*
-- [ ] **T — Conversation memory** — maintain chat history so follow-up questions work in context *(Medium — Stateful pipelines)*
-- [ ] **U — Streamlit dashboard** — web UI to run queries live, display retrieved chunks, compare RAG vs no-RAG side-by-side, and visualise evaluation metrics (latency, faithfulness, retrieval scores) *(Medium — Streamlit, frontend ML tools)*
+- [ ] **R — Evaluation pipeline** — run all config dimensions against the 32 Q/A pairs in `docs/eval_qa_pairs.md`: RAG vs no-RAG, chunking strategy (naive/sentence/tiktoken), retrieval method (dense/BM25/hybrid), fusion strategy (RRF vs weighted sum), reranking (on/off), and embedding model (all-MiniLM-L6-v2, bge-small-en, e5-small); report answers side-by-side per comparison dimension for manual review *(Medium — Evaluation, ablation studies)*
+- [ ] **O — MCQ benchmark + MLflow** — handcraft a fictional universe PDF (10-15 pages with tables, named entities, dates, multi-section content) and 20-30 MCQ questions whose answers require retrieval to get right; run all config dimensions against the MCQ set; score by % accuracy; log accuracy and per-stage latency to MLflow for cross-run comparison *(Medium — MCQ benchmarking, MLflow, experiment tracking)*
 
 ### V6
+- [ ] **S — FastAPI server** — expose four endpoints: `POST /upload` (ingest a document), `POST /query` (run the RAG pipeline and return JSON), `POST /evaluate` (run a fixed question set and return metrics), `POST /compare` (run the same query across two configs and return both results side-by-side) *(Medium — REST APIs, async Python)*
+- [ ] **U — Streamlit dashboard** — web UI to run queries live, display retrieved chunks, compare RAG vs no-RAG side-by-side, and visualise evaluation metrics (latency, retrieval scores) *(Medium — Streamlit, frontend ML tools)*
+
+### V7
+- [ ] **P — Streaming LLM output** — stream Ollama/OpenAI tokens to stdout instead of waiting for full response *(Low — Generator patterns, streaming APIs)*
+- [ ] **T — Conversation memory** — maintain chat history so follow-up questions work in context *(Medium — Stateful pipelines)*
+
+### V8
+- [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
+- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking; straightforward with Qdrant payload filters, awkward without it *(Low — Metadata, search filters)*
+
+### V9
 - [ ] **V — Web ingestion** — `requests` + `BeautifulSoup` scraper as a third data source *(Medium — Web scraping)*
 - [ ] **W — Docker** — `Dockerfile` + `docker-compose.yml` bundling app + Ollama *(Medium — Containers)*
-- [ ] **X — Embedding model comparison** — swap the embedding model (`all-MiniLM-L6-v2`, `bge-small-en`, `e5-small`) on a fixed eval set and log retrieval quality scores; analogous to N (chunking comparison) but for the embedding dimension; requires R *(Medium — Model evaluation, ablation studies)*
-- [ ] **Y — MLflow experiment tracking** — log each run's parameters (embedding model, chunk size, retrieval method) and metrics (retrieval score, faithfulness, latency) to MLflow so experiments from N, X, and R are comparable in a single UI *(Medium — MLflow, experiment tracking)*
-- [ ] **Z — RAGAS evaluation** — plug in the `ragas` library for context precision/recall/faithfulness metrics *(High — RAG evaluation science)*
 - [ ] **AA — Async pipeline** — `asyncio`-based ingestion and embedding for parallel processing *(High — Async Python)*
 
 ---
@@ -122,7 +125,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 **Theme:** Replace naive cosine similarity with a state-of-the-art retrieval stack.
 
-**Why:** K, L, and M are pure retrieval algorithm improvements that work directly on top of the existing FAISS + SQLite stack — no infrastructure changes required. Chunking ablations (N) moved to V5 because they need the evaluation framework (R) to be meaningful.
+**Why:** K, L, and M are pure retrieval algorithm improvements that work directly on top of the existing FAISS + SQLite stack — no infrastructure changes required.
 
 ### Checklist
 - [x] **I** — HyDE
@@ -132,34 +135,61 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 ---
 
-## V5 — Serving & evaluation
+## V5 — Evaluation
 
-**Theme:** Turn the script into a real service you can benchmark and demo.
+**Theme:** Systematic benchmarking to quantify the impact of every design choice.
 
-**Why:** Qdrant (J) replaces the FAISS + SQLite dual-store with a single service that handles vectors, metadata, and CRUD — and makes metadata filtering (Q) a first-class feature. With infrastructure and retrieval quality settled, the rest of V5 builds the interface: evaluation (R) gives a quantitative story; FastAPI (S) makes it demo-able; streaming (P) makes it feel live; memory (T) makes it useful as a chatbot.
+**Why:** R uses the existing 32 Q/A pairs in `docs/eval_qa_pairs.md` to run all config comparisons and produces side-by-side text answers for manual review — no judge LLM needed. O complements it with a handcrafted fictional-universe MCQ dataset that gives clean numeric accuracy scores (the LLM has zero prior knowledge of the content, so correct answers prove retrieval worked) and logs accuracy + per-stage latency to MLflow for cross-run comparison.
 
 ### Checklist
-- [ ] **J** — Qdrant vector database
-- [ ] **Q** — Metadata filtering
-- [ ] **P** — Streaming LLM output
-- [ ] **R** — Evaluation framework
-- [ ] **N** — Chunking strategy comparison (requires R)
+- [ ] **R** — Evaluation pipeline
+- [ ] **O** — MCQ benchmark + MLflow
+
+---
+
+## V6 — Serving & demo
+
+**Theme:** Turn the pipeline into a demo-able product with an API and visual interface.
+
+**Why:** FastAPI (S) exposes the pipeline as a REST API with upload, query, evaluate, and compare endpoints. Streamlit (U) wraps it in a browser UI for live demos. U depends on S — the dashboard calls the API rather than the pipeline directly.
+
+### Checklist
 - [ ] **S** — FastAPI server
-- [ ] **T** — Conversation memory
 - [ ] **U** — Streamlit dashboard
 
 ---
 
-## V6 — Production & advanced
+## V7 — Chatbot features
 
-**Theme:** Production hardening and advanced RAG techniques.
+**Theme:** Make it feel like a real conversational assistant.
 
-**Why:** Broader data ingestion expands use cases; RAGAS (Z) gives publishable evaluation metrics; Docker (W) makes it deployable anywhere; async (AA) handles real workloads.
+**Why:** Streaming (P) makes responses feel live rather than waiting for the full generation. Conversation memory (T) lets follow-up questions reference earlier turns. Neither requires infrastructure changes — both work on top of the existing pipeline.
+
+### Checklist
+- [ ] **P** — Streaming LLM output
+- [ ] **T** — Conversation memory
+
+---
+
+## V8 — Infrastructure upgrade
+
+**Theme:** Replace the dual FAISS+SQLite store with a proper vector database.
+
+**Why:** Qdrant (J) handles vectors, metadata, and CRUD in one service, eliminating the dual-store sync problem. Metadata filtering (Q) becomes a first-class feature via Qdrant payload filters. Q strictly requires J.
+
+### Checklist
+- [ ] **J** — Qdrant vector database
+- [ ] **Q** — Metadata filtering
+
+---
+
+## V9 — Production
+
+**Theme:** Production hardening and deployment.
+
+**Why:** Web ingestion (V) expands data sources beyond local files. Async (AA) handles real concurrent workloads. Docker (W) is intentionally last — it packages the complete project once everything else is settled.
 
 ### Checklist
 - [ ] **V** — Web ingestion
 - [ ] **W** — Docker
-- [ ] **X** — Embedding model comparison
-- [ ] **Y** — MLflow experiment tracking
-- [ ] **Z** — RAGAS evaluation
 - [ ] **AA** — Async pipeline

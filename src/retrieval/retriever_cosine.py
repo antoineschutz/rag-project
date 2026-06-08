@@ -53,6 +53,6 @@ def build_cosine_retriever(data_path: str, embedder: Embedder) -> RetrieverCosin
         doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
         np.save(config.EMBEDDINGS_PATH, doc_embeddings)
         with open(config.CHUNKS_PATH, "w") as f:
-            json.dump(chunked_docs, f, indent=4)
+            json.dump(chunked_docs, f, indent=4, ensure_ascii=False)
         logger.info("Embeddings saved to numpy cache.")
     return RetrieverCosine(chunked_docs, doc_embeddings)

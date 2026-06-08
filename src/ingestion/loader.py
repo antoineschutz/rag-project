@@ -111,7 +111,40 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
     if best_run_mid < 0:
         return None
 
-    return search_lo + best_run_mid * bin_width
+    # Real column gutters are at least ~6 pt wide; narrower gaps are word-spacing noise.
+    if best_run_len * bin_width < 6:
+        return None
+
+    split_candidate = search_lo + best_run_mid * bin_width
+
+    # Reject splits that are too far from the horizontal centre of the word
+    # distribution.  A real two-column gutter sits near the midpoint; a
+    # spurious gap found inside a single-column text block can land anywhere.
+    x_centers = [(w["x0"] + w["x1"]) / 2 for w in words]
+    x_min, x_max = min(x_centers), max(x_centers)
+    text_half_width = (x_max - x_min) / 2
+    text_center = x_min + text_half_width
+    if text_half_width > 0 and abs(split_candidate - text_center) > text_half_width * 0.25:
+        return None
+
+    return split_candidate
+
+
+def _find_footnote_top(page: pdfplumber.pdf.Page) -> float:
+    """Return the y-coordinate of the top of the footnote zone, or page.height if none detected.
+
+    Detects the horizontal separator rule that LaTeX draws between body and footnotes:
+    a short horizontal line in the bottom 40% of the page.
+    """
+    separator_lines = [
+        l for l in page.lines
+        if l["height"] < 2
+        and l["top"] > page.height * 0.60
+        and (l["x1"] - l["x0"]) > page.width * 0.10
+    ]
+    if separator_lines:
+        return min(l["top"] for l in separator_lines)
+    return page.height
 
 
 def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
@@ -121,9 +154,15 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
     table_bboxes = [t.bbox for t in tables]
     table_mds = [_table_to_markdown(t.extract()) for t in tables]
 
-    # Phase 2: body text (words outside table regions)
+    footnote_top = _find_footnote_top(page)
+
+    # Phase 2: body text (words outside table regions and above footnote zone)
     all_words = page.extract_words(x_tolerance=1)
-    body_words = [w for w in all_words if not any(_word_in_bbox(w, bb) for bb in table_bboxes)]
+    body_words = [
+        w for w in all_words
+        if not any(_word_in_bbox(w, bb) for bb in table_bboxes)
+        and w["top"] < footnote_top
+    ]
 
     if body_words:
         split_x = _find_column_split(body_words, page.width)
@@ -145,7 +184,11 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
             keyed_lines = _words_to_text(body_words_sorted)
 
         # Phase 3: header labelling — match chars by y-position bucket, not text substring
-        non_table_chars = [c for c in page.chars if not any(_word_in_bbox(c, bb) for bb in table_bboxes)]
+        non_table_chars = [
+            c for c in page.chars
+            if not any(_word_in_bbox(c, bb) for bb in table_bboxes)
+            and c["top"] < footnote_top
+        ]
         if non_table_chars:
             sizes = [c["size"] for c in non_table_chars if c.get("size")]
             median_size = statistics.median(sizes) if sizes else 0
