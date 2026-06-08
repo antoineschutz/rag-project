@@ -9,7 +9,7 @@ Data flows linearly through five stages:
 1. **Ingestion** — loads PDFs, Markdown, and DOCX files from `./data/`
 2. **Chunking** — sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens per chunk, 50-token overlap
 3. **Embedding** — `all-MiniLM-L6-v2` via `sentence-transformers`
-4. **Retrieval** — FAISS vector index (exact `IndexFlatIP` or approximate `IndexIVFFlat`) backed by SQLite; sklearn cosine similarity kept as a comparison baseline via `--store numpy`
+4. **Retrieval** — dense cosine (numpy or FAISS), BM25 lexical search, or hybrid fusion of both; optional cross-encoder re-ranking on top
 5. **Generation** — dispatches to Ollama (local) or OpenAI
 
 ## Setup
@@ -51,6 +51,18 @@ python main.py --query "..." --store faiss
 # Use approximate IVF index (better for large corpora)
 python main.py --query "..." --store faiss --index-type ivf
 
+# BM25 (lexical) retrieval
+python main.py --query "..." --retriever bm25
+
+# Hybrid retrieval (dense + BM25, RRF fusion)
+python main.py --query "..." --retriever hybrid
+
+# Hybrid with weighted-sum fusion and custom alpha
+python main.py --query "..." --retriever hybrid --fusion weighted --alpha 0.7
+
+# Cross-encoder re-ranking on top of any retriever
+python main.py --query "..." --rerank
+
 # See all options
 python main.py --help
 ```
@@ -67,22 +79,32 @@ Place PDF, Markdown, or DOCX files in `./data/` to include them in the knowledge
 
 Cache files are stored in `./cache/`. Delete them to force a full re-embed on the next run.
 
+## Retrieval modes
+
+| Flag | Method | Notes |
+|------|--------|-------|
+| (default) | Dense cosine | Uses `--store` backend above |
+| `--retriever bm25` | BM25 lexical | No embeddings needed |
+| `--retriever hybrid` | Dense + BM25 fused | `--fusion rrf\|weighted`, `--alpha` controls weight (default 0.5) |
+| `--rerank` | Cross-encoder re-score | Stacks on top of any retriever |
+
 ## Experiment results
 
-Four questions across different retrieval difficulties. Model: `phi3` via Ollama. ✓ = correct, ~ = partially correct, ✗ = wrong or hallucinated.
+Model: `phi3` via Ollama. ✓ = correct, ~ = partially correct, ✗ = wrong or hallucinated.
 
 Note: `rag_design_notes.md` and `qa_benchmark_report.docx` are synthetic documents created for this project.
 
-| Query | Ground truth | Source | Difficulty | No-RAG | FAISS RAG | Notes |
-|---|---|---|---|---|---|---|
-| `"How much did adding source attribution to the RAG prompt reduce hallucination?"` | From 23% to 6% | `rag_design_notes.md` | Answer in a flat Markdown file — no parsing challenge | ✗ | ✓ | No-RAG claimed no knowledge. RAG retrieved the unique stat cleanly |
-| `"What two pre-training tasks does BERT use?"` | Masked Language Modeling (MLM) and Next Sentence Prediction (NSP) | `bert_devlin2018.pdf` | Answer in PDF prose — requires correct two-column reading order | ✓ | ✓ | Both correct; phi3 has this memorised but RAG still retrieves the right section |
-| `"What is the query latency of IndexFlatIP compared to IndexIVF?"` | IndexFlatIP: 4 ms · IndexIVF: 1 ms | `rag_design_notes.md` | Answer in a Markdown table — requires structured table retrieval | ✗ | ✓ | No-RAG had no knowledge. RAG retrieved the latency comparison table and answered correctly |
-| `"How many more attention heads does BERT-BASE have compared to the base Transformer model?"` | BERT-BASE: 12 heads · Transformer base: 8 heads · difference: 4 | `bert_devlin2018.pdf` + `attention_is_all_you_need.pdf` | Answer requires combining facts from two different papers | ✗ | ~ | Retriever surfaced BERT=12 but not Transformer=8 together. Synthesis incomplete. Target of V4 retrieval improvements |
+| Query | Ground truth | Source | Difficulty | No-RAG | Dense RAG | Best combo | Notes |
+|---|---|---|---|---|---|---|---|
+| `"How much did adding source attribution to the RAG prompt reduce hallucination?"` | From 23% to 6% | `rag_design_notes.md` | Flat Markdown file — no parsing challenge | ✗ | ✓ | — | RAG retrieves the unique stat cleanly |
+| `"What two pre-training tasks does BERT use?"` | MLM and NSP | `bert_devlin2018.pdf` | PDF prose — two-column reading order | ✓ | ✗ | ✓ `--retriever hybrid --rerank` | Dense drifted to GPT-paper chunks; BM25 locked on "BERT", reranker filtered noise |
+| `"What is the query latency of IndexFlatIP compared to IndexIVF?"` | FlatIP: 4 ms · IVF: 1 ms | `rag_design_notes.md` | Markdown table — exact numeric retrieval | ✗ | ~ | ✓ `--retriever bm25 --rerank` | Dense got direction right but wrong numbers; BM25 exact-matched the rare technical terms |
+| `"How many more attention heads does BERT-BASE have compared to the base Transformer model?"` | 12 − 8 = 4 | `bert_devlin2018.pdf` + `attention_is_all_you_need.pdf` | Cross-document synthesis — two papers | ✗ | ✗ | ✗ `--retriever hybrid --top-k 10 --rerank` | No single-shot retrieval strategy surfaces both facts together; requires multi-hop query decomposition |
 
-**FAISS RAG score: 3/4 (+ 1 partial)**
-
-RAG succeeds on clean single-document retrieval (md files, PDF prose, md tables) and fails on cross-document synthesis — the main ceiling to address in V4.
+**Key findings:**
+- Single-document retrieval (Q1, Q2, Q3) is fully solvable with the right retriever combination
+- BM25 outperforms dense on queries with rare exact-match terminology
+- Cross-document synthesis (Q4) remains unsolved — a structural limitation of single-shot retrieval
 
 ---
 
@@ -92,10 +114,11 @@ HyDE (Hypothetical Document Embeddings) asks the LLM to draft a hypothetical ans
 
 Model: `llama3.1` (8B). Query: *"What trick does the Transformer use so it doesn't have to read sentences left to right?"*
 
-| Path | Top retrieval score | Answer |
+| Path | Answer | Notes |
 |---|---|---|
-| No-RAG | — | ✓ llama3.1 knows self-attention from training data |
-| FAISS RAG | 0.47 | ✗ Low-confidence chunks; model grabbed one sentence without synthesising |
-| FAISS RAG + HyDE | **0.75** | ✓ High-confidence chunks from the right paper; model correctly explained self-attention and parallel processing |
+| No-RAG | ✓ | llama3.1 knows self-attention from training data |
+| Dense RAG | ~ | Retrieved BERT MLM chunks — right idea, wrong paper |
+| Dense RAG + HyDE | ~ | Retrieved cross-attention chunks — vague |
+| `--hyde --retriever hybrid --rerank` | ✗ | Still retrieves BERT MLM; query semantics map to bidirectionality regardless of retriever |
 
-The hypothetical passage generated by HyDE used ML vocabulary (*self-attention, parallel processing, query/key/value, RNNs*) that landed 0.28 cosine similarity points closer to the actual paper chunks. Enable with `--hyde`.
+The query's phrasing ("doesn't have to read left to right") maps to BERT's bidirectionality story in embedding space across all retriever strategies tried. No-RAG remains the best path for this query — llama3.1 answers correctly from training data without retrieval.

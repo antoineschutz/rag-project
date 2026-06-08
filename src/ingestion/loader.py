@@ -82,8 +82,6 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
         return None
 
     max_count = max(counts)
-    if max_count == 0:
-        return None
 
     # A bin is "empty" when it has <= 10% of the peak density
     threshold = max_count * 0.10
@@ -195,7 +193,8 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
             labelled_lines = []
             for top_key, line in keyed_lines:
                 line_chars = [c for c in non_table_chars if abs(round(c["top"] / 3) * 3 - top_key) <= 3]
-                avg_size = statistics.mean(c["size"] for c in line_chars) if line_chars else 0
+                sized = [c["size"] for c in line_chars if c.get("size")]
+                avg_size = statistics.mean(sized) if sized else 0
                 if avg_size >= median_size * 1.3 and 0 < len(line) < 80:
                     labelled_lines.append("## " + line)
                 else:
