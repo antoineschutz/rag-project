@@ -59,6 +59,11 @@ def main() -> None:
         help="Dense weight for weighted sum fusion, between 0 and 1 (default: 0.5)",
     )
     parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Re-rank retrieved chunks with a cross-encoder before generation",
+    )
+    parser.add_argument(
         "--hyde",
         action="store_true",
         help="Use HyDE: embed a hypothetical answer passage instead of the raw query",
@@ -82,9 +87,11 @@ def main() -> None:
         print(answer)
         return
 
+    retrieval_k = top_k * 3 if args.rerank else top_k
+
     if args.retriever == "bm25":
         retriever = build_bm25_retriever(data_path)
-        results = retriever.retrieve(args.query, top_k=top_k)
+        results = retriever.retrieve(args.query, top_k=retrieval_k)
     else:
         embedder = Embedder()
 
@@ -101,13 +108,17 @@ def main() -> None:
                 data_path, embedder, args.store, args.index_type,
                 fusion=args.fusion, alpha=args.alpha,
             )
-            results = retriever.retrieve(args.query, query_embedding, top_k=top_k)
+            results = retriever.retrieve(args.query, query_embedding, top_k=retrieval_k)
         else:
             if args.store == "faiss":
                 retriever = build_faiss_retriever(data_path, embedder, index_type=args.index_type)
             else:
                 retriever = build_cosine_retriever(data_path, embedder)
-            results = retriever.retrieve(query_embedding, top_k=top_k)
+            results = retriever.retrieve(query_embedding, top_k=retrieval_k)
+
+    if args.rerank:
+        from src.reranker.reranker import Reranker
+        results = Reranker().rerank(args.query, results, top_k=top_k)
 
     contexts = [r["text"] for r in results]
     rag_prompt = build_prompt_rag(args.query, contexts)

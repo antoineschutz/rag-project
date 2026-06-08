@@ -69,7 +69,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **I — HyDE (Hypothetical Document Embeddings)** — before embedding a query, prompt the LLM to generate a hypothetical answer passage and embed that instead of the raw query string; improves recall for short or ambiguous queries with no index changes; requires the LLM to be available at query time *(Low — Query augmentation, retrieval quality)*
 - [x] **K — BM25 retrieval** — add `rank_bm25` as a second retrieval method alongside cosine similarity *(Medium — Sparse retrieval, lexical search)*
 - [x] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
-- [ ] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
+- [x] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
 ### V5
 - [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
 - [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking; straightforward with Qdrant payload filters, awkward without it *(Low — Metadata, search filters)*
@@ -128,7 +128,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **I** — HyDE
 - [x] **K** — BM25 retrieval
 - [x] **L** — Hybrid retrieval
-- [ ] **M** — Re-ranking
+- [x] **M** — Re-ranking
 
 ---
 
