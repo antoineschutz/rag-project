@@ -40,14 +40,78 @@ def _word_in_bbox(word: dict, bbox: tuple) -> bool:
 
 
 def _words_to_text(words: list[dict]) -> list[tuple[int, str]]:
-    """Reconstruct paragraph text from word dicts; returns (top_bucket, line_text) pairs sorted by top position."""
+    """Reconstruct paragraph text from word dicts; returns (top_bucket, line_text) pairs sorted by top position.
+
+    Within each top bucket words are sorted by x0 so that superscripts and
+    descenders (which have slightly different top values) are placed in reading
+    order rather than the order they happen to be sorted by top.
+    """
     if not words:
         return []
-    lines: dict[int, list[str]] = {}
+    lines: dict[int, list[dict]] = {}
     for w in words:
         key = round(w["top"] / 3) * 3
-        lines.setdefault(key, []).append(w["text"])
-    return [(k, " ".join(lines[k])) for k in sorted(lines)]
+        lines.setdefault(key, []).append(w)
+    return [
+        (k, " ".join(w["text"] for w in sorted(lines[k], key=lambda w: w["x0"])))
+        for k in sorted(lines)
+    ]
+
+
+def _find_column_split(words: list[dict], page_width: float) -> float | None:
+    """Find the x-coordinate of the gutter between two columns, or None if no clear gap exists.
+
+    Builds a histogram of word x-centre positions in 2-point bins across the
+    middle 30–70% of the page width, then locates the longest consecutive run
+    of near-empty bins that has non-empty bins on both sides (the actual gutter).
+    Returns the midpoint of that run, or None if no such gap is found.
+    """
+    search_lo = page_width * 0.30
+    search_hi = page_width * 0.70
+    bin_width = 2.0
+    n_bins = int((search_hi - search_lo) / bin_width) + 1
+    counts = [0] * n_bins
+
+    for w in words:
+        xc = (w["x0"] + w["x1"]) / 2
+        if search_lo <= xc <= search_hi:
+            b = min(int((xc - search_lo) / bin_width), n_bins - 1)
+            counts[b] += 1
+
+    if not any(counts):
+        return None
+
+    max_count = max(counts)
+    if max_count == 0:
+        return None
+
+    # A bin is "empty" when it has <= 10% of the peak density
+    threshold = max_count * 0.10
+    empty = [c <= threshold for c in counts]
+
+    # Find all runs of consecutive empty bins that are flanked by non-empty bins
+    best_run_len = 0
+    best_run_mid = -1
+    i = 0
+    while i < n_bins:
+        if empty[i]:
+            j = i
+            while j < n_bins and empty[j]:
+                j += 1
+            # Run is i..j-1; flanked on left (i>0 and not empty[i-1]) and right (j<n_bins and not empty[j])
+            left_ok = i > 0 and not empty[i - 1]
+            right_ok = j < n_bins and not empty[j]
+            if left_ok and right_ok and (j - i) > best_run_len:
+                best_run_len = j - i
+                best_run_mid = (i + j) / 2
+            i = j
+        else:
+            i += 1
+
+    if best_run_mid < 0:
+        return None
+
+    return search_lo + best_run_mid * bin_width
 
 
 def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
@@ -62,15 +126,20 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
     body_words = [w for w in all_words if not any(_word_in_bbox(w, bb) for bb in table_bboxes)]
 
     if body_words:
-        midpoint = page.width / 2
-        strip_lo, strip_hi = page.width * 0.425, page.width * 0.575
-        center_count = sum(1 for w in body_words if strip_lo <= (w["x0"] + w["x1"]) / 2 <= strip_hi)
-        two_column = len(body_words) > 20 and center_count / len(body_words) < 0.05
+        split_x = _find_column_split(body_words, page.width)
+        two_column = split_x is not None
 
         if two_column:
-            left = sorted([w for w in body_words if (w["x0"] + w["x1"]) / 2 < midpoint], key=lambda w: (w["top"], w["x0"]))
-            right = sorted([w for w in body_words if (w["x0"] + w["x1"]) / 2 >= midpoint], key=lambda w: (w["top"], w["x0"]))
-            keyed_lines = _words_to_text(left) + _words_to_text(right)
+            assert split_x is not None
+            left_words = sorted(
+                [w for w in body_words if (w["x0"] + w["x1"]) / 2 < split_x],
+                key=lambda w: (w["top"], w["x0"]),
+            )
+            right_words = sorted(
+                [w for w in body_words if (w["x0"] + w["x1"]) / 2 >= split_x],
+                key=lambda w: (w["top"], w["x0"]),
+            )
+            keyed_lines = _words_to_text(left_words) + _words_to_text(right_words)
         else:
             body_words_sorted = sorted(body_words, key=lambda w: (w["top"], w["x0"]))
             keyed_lines = _words_to_text(body_words_sorted)
