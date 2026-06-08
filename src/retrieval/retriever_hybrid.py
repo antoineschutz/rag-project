@@ -4,9 +4,10 @@ from typing import Any
 import numpy as np
 
 from src.config import config
-from src.retrieval.retriever import Retriever
-from src.retrieval.retriever_bm25 import RetrieverBM25
-from src.retrieval.retriever_faiss import RetrieverFAISS
+from src.embeddings.embed import Embedder
+from src.retrieval.retriever_cosine import RetrieverCosine, build_cosine_retriever
+from src.retrieval.retriever_bm25 import RetrieverBM25, build_bm25_retriever
+from src.retrieval.retriever_faiss import RetrieverFAISS, build_faiss_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class RetrieverHybrid:
 
     def __init__(
         self,
-        dense: Retriever | RetrieverFAISS,
+        dense: RetrieverCosine | RetrieverFAISS,
         bm25: RetrieverBM25,
         fusion: str = "rrf",
         alpha: float = 0.5,
@@ -103,3 +104,21 @@ class RetrieverHybrid:
 
         fused.sort(key=lambda x: x["score"], reverse=True)
         return fused[:top_k]
+
+
+def build_hybrid_retriever(
+    data_path: str,
+    embedder: Embedder,
+    store: str = "numpy",
+    index_type: str = "flat",
+    fusion: str = "rrf",
+    alpha: float = 0.5,
+    k: int = 60,
+) -> RetrieverHybrid:
+    """Build a hybrid retriever combining a dense backend and BM25."""
+    if store == "faiss":
+        dense = build_faiss_retriever(data_path, embedder, index_type=index_type)
+    else:
+        dense = build_cosine_retriever(data_path, embedder)
+    bm25 = build_bm25_retriever(data_path)
+    return RetrieverHybrid(dense, bm25, fusion=fusion, alpha=alpha, k=k)

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.retrieval.retriever import Retriever
+from src.retrieval.retriever_cosine import RetrieverCosine
 from src.retrieval.retriever_faiss import RetrieverFAISS
 
 
@@ -22,7 +22,7 @@ QUERY = EMBEDDINGS[2:3]  # shape (1, DIM) — identical to doc 2
 
 @pytest.fixture
 def retriever():
-    return Retriever(DOCS, EMBEDDINGS)
+    return RetrieverCosine(DOCS, EMBEDDINGS)
 
 
 @pytest.fixture

@@ -3,7 +3,10 @@ import logging
 
 from src.config import config
 from src.embeddings.embed import Embedder
-from src.retrieval.factory import build_retriever, build_bm25_retriever, build_hybrid_retriever
+from src.retrieval.retriever_cosine import build_cosine_retriever
+from src.retrieval.retriever_faiss import build_faiss_retriever
+from src.retrieval.retriever_bm25 import build_bm25_retriever
+from src.retrieval.retriever_hybrid import build_hybrid_retriever
 from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
 from src.llm.client import LLMClient
 
@@ -100,7 +103,10 @@ def main() -> None:
             )
             results = retriever.retrieve(args.query, query_embedding, top_k=top_k)
         else:
-            retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
+            if args.store == "faiss":
+                retriever = build_faiss_retriever(data_path, embedder, index_type=args.index_type)
+            else:
+                retriever = build_cosine_retriever(data_path, embedder)
             results = retriever.retrieve(query_embedding, top_k=top_k)
 
     contexts = [r["text"] for r in results]

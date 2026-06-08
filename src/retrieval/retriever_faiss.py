@@ -1,10 +1,15 @@
 import logging
+import os
 from typing import Any
 
 import faiss
 import numpy as np
 
 from src.config import config
+from src.embeddings.embed import Embedder
+from src.ingestion.loader import load_documents
+from src.chunking.chunk import chunk_documents
+from src.store.sqlite_store import ChunkStore
 
 logger = logging.getLogger(__name__)
 
@@ -61,3 +66,26 @@ class RetrieverFAISS:
             logger.debug("%.4f | [%s] %s", score, self.docs[idx]["source"], self.docs[idx]["text"])
 
         return results
+
+
+def build_faiss_retriever(
+    data_path: str,
+    embedder: Embedder,
+    index_type: str = "flat",
+) -> RetrieverFAISS:
+    """Build a FAISS retriever, loading index and chunks from cache if available."""
+    os.makedirs(config.CACHE_DIR, exist_ok=True)
+    chunk_store = ChunkStore(config.SQLITE_DB_PATH)
+    if os.path.exists(config.FAISS_INDEX_PATH) and chunk_store.exists():
+        logger.info("Loading from FAISS + SQLite cache...")
+        chunked_docs = chunk_store.load()
+        index = faiss.read_index(config.FAISS_INDEX_PATH)
+        return RetrieverFAISS.from_index(chunked_docs, index)
+    docs = load_documents(data_path)
+    chunked_docs = chunk_documents(docs)
+    doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
+    chunk_store.save(chunked_docs)
+    retriever = RetrieverFAISS(chunked_docs, doc_embeddings, index_type=index_type)
+    faiss.write_index(retriever.index, config.FAISS_INDEX_PATH)
+    logger.info("Embeddings saved to FAISS + SQLite cache.")
+    return retriever

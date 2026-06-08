@@ -5,6 +5,8 @@ import numpy as np
 from rank_bm25 import BM25Okapi
 
 from src.config import config
+from src.ingestion.loader import load_documents
+from src.chunking.chunk import chunk_documents
 
 logger = logging.getLogger(__name__)
 
@@ -32,3 +34,10 @@ class RetrieverBM25:
             }
             for i in top_indices
         ]
+
+
+def build_bm25_retriever(data_path: str) -> RetrieverBM25:
+    """Load and chunk documents, then build a BM25 index. No embeddings or cache needed."""
+    docs = load_documents(data_path)
+    chunked = chunk_documents(docs)
+    return RetrieverBM25(chunked)

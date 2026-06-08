@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.retrieval.retriever import Retriever
+from src.retrieval.retriever_cosine import RetrieverCosine
 from src.retrieval.retriever_bm25 import RetrieverBM25
 from src.retrieval.retriever_hybrid import RetrieverHybrid
 
@@ -20,8 +20,8 @@ QUERY_EMBEDDING = EMBEDDINGS[2:3]
 
 
 @pytest.fixture
-def dense() -> Retriever:
-    return Retriever(DOCS, EMBEDDINGS)
+def dense() -> RetrieverCosine:
+    return RetrieverCosine(DOCS, EMBEDDINGS)
 
 
 @pytest.fixture
@@ -30,12 +30,12 @@ def bm25() -> RetrieverBM25:
 
 
 @pytest.fixture
-def hybrid_rrf(dense: Retriever, bm25: RetrieverBM25) -> RetrieverHybrid:
+def hybrid_rrf(dense: RetrieverCosine, bm25: RetrieverBM25) -> RetrieverHybrid:
     return RetrieverHybrid(dense, bm25, fusion="rrf")
 
 
 @pytest.fixture
-def hybrid_weighted(dense: Retriever, bm25: RetrieverBM25) -> RetrieverHybrid:
+def hybrid_weighted(dense: RetrieverCosine, bm25: RetrieverBM25) -> RetrieverHybrid:
     return RetrieverHybrid(dense, bm25, fusion="weighted", alpha=0.5)
 
 
@@ -66,7 +66,7 @@ def test_rrf_result_keys(hybrid_rrf: RetrieverHybrid) -> None:
     assert set(results[0].keys()) == {"text", "source", "score"}
 
 
-def test_rrf_boosts_overlap(dense: Retriever, bm25: RetrieverBM25) -> None:
+def test_rrf_boosts_overlap(dense: RetrieverCosine, bm25: RetrieverBM25) -> None:
     # c.txt ranks #1 in dense (QUERY_EMBEDDING matches it exactly) and top-2 in BM25
     # for the query "neural network gradient descent" — it should win the fused ranking
     retriever = RetrieverHybrid(dense, bm25, fusion="rrf")
