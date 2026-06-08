@@ -3,7 +3,7 @@ import logging
 
 from src.config import config
 from src.embeddings.embed import Embedder
-from src.retrieval.factory import build_retriever
+from src.retrieval.factory import build_retriever, build_bm25_retriever
 from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
 from src.llm.client import LLMClient
 
@@ -38,6 +38,12 @@ def main() -> None:
         help="FAISS index type, only applies with --store faiss (default: flat)",
     )
     parser.add_argument(
+        "--retriever",
+        choices=["dense", "bm25"],
+        default="dense",
+        help="Retrieval method: dense (embedding-based) or bm25 (lexical, default: dense)",
+    )
+    parser.add_argument(
         "--hyde",
         action="store_true",
         help="Use HyDE: embed a hypothetical answer passage instead of the raw query",
@@ -61,17 +67,21 @@ def main() -> None:
         print(answer)
         return
 
-    embedder = Embedder()
-    retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
-
-    if args.hyde:
-        from src.hyde.hyde import generate_hypothetical_doc
-        embed_input = generate_hypothetical_doc(args.query, llm)
+    if args.retriever == "bm25":
+        retriever = build_bm25_retriever(data_path)
+        results = retriever.retrieve(args.query, top_k=top_k)
     else:
-        embed_input = args.query
+        embedder = Embedder()
+        retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
 
-    query_embedding = embedder.embed_query(embed_input)
-    results = retriever.retrieve(query_embedding, top_k=top_k)
+        if args.hyde:
+            from src.hyde.hyde import generate_hypothetical_doc
+            embed_input = generate_hypothetical_doc(args.query, llm)
+        else:
+            embed_input = args.query
+
+        query_embedding = embedder.embed_query(embed_input)
+        results = retriever.retrieve(query_embedding, top_k=top_k)
 
     contexts = [r["text"] for r in results]
     rag_prompt = build_prompt_rag(args.query, contexts)

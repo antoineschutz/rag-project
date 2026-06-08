@@ -10,10 +10,18 @@ from src.embeddings.embed import Embedder
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
 from src.retrieval.retriever import Retriever
+from src.retrieval.retriever_bm25 import RetrieverBM25
 from src.retrieval.retriever_faiss import RetrieverFAISS
 from src.store.sqlite_store import ChunkStore
 
 logger = logging.getLogger(__name__)
+
+
+def build_bm25_retriever(data_path: str) -> RetrieverBM25:
+    """Load and chunk documents, then build a BM25 index. No embeddings or cache needed."""
+    docs = load_documents(data_path)
+    chunked = chunk_documents(docs)
+    return RetrieverBM25(chunked)
 
 
 def build_retriever(

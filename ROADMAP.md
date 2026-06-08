@@ -67,13 +67,13 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 ### V4
 - [x] **I — HyDE (Hypothetical Document Embeddings)** — before embedding a query, prompt the LLM to generate a hypothetical answer passage and embed that instead of the raw query string; improves recall for short or ambiguous queries with no index changes; requires the LLM to be available at query time *(Low — Query augmentation, retrieval quality)*
-- [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
-- [ ] **K — BM25 retrieval** — add `rank_bm25` as a second retrieval method alongside cosine similarity *(Medium — Sparse retrieval, lexical search)*
+- [x] **K — BM25 retrieval** — add `rank_bm25` as a second retrieval method alongside cosine similarity *(Medium — Sparse retrieval, lexical search)*
 - [ ] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
 - [ ] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
 ### V5
+- [ ] **J — Qdrant vector database** — replace FAISS + SQLite with a Qdrant collection; each chunk stored as a point `{id, vector, payload}` where payload holds text and source; eliminates the dual-store sync problem and enables metadata filtering (Q) as a first-class feature *(Medium — Vector databases, Qdrant)*
+- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking; straightforward with Qdrant payload filters, awkward without it *(Low — Metadata, search filters)*
 - [ ] **P — Streaming LLM output** — stream Ollama/OpenAI tokens to stdout instead of waiting for full response *(Low — Generator patterns, streaming APIs)*
-- [ ] **Q — Metadata filtering** — allow `retriever.retrieve()` to filter by source before ranking *(Low if J is done, Medium otherwise — Metadata, search filters)*
 - [ ] **R — Evaluation framework** — run RAG and no-RAG on a fixed set of question-answer pairs, score each answer for correctness, and report results side-by-side *(Medium — RAG evaluation, metrics)*
 - [ ] **N — Chunking strategy comparison** — run the eval set from R across naive/sentence/tiktoken chunkers and log scores; requires R *(Medium — Ablation studies)*
 - [ ] **S — FastAPI server** — expose four endpoints: `POST /upload` (ingest a document), `POST /query` (run the RAG pipeline and return JSON), `POST /evaluate` (run a fixed question set and return metrics), `POST /compare` (run the same query across two configs and return both results side-by-side) *(Medium — REST APIs, async Python)*
@@ -122,12 +122,11 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 **Theme:** Replace naive cosine similarity with a state-of-the-art retrieval stack.
 
-**Why:** BM25 (K), hybrid search (L), and re-ranking (M) are independent retrieval improvements that work on top of the existing FAISS + SQLite stack. Qdrant (J) is an optional infrastructure upgrade that collapses the dual-store into a single service with built-in persistence, CRUD, and metadata filtering — useful but not a prerequisite for K/L/M. Chunking ablations (N) moved to V5 because they require the evaluation framework (R) to be meaningful.
+**Why:** K, L, and M are pure retrieval algorithm improvements that work directly on top of the existing FAISS + SQLite stack — no infrastructure changes required. Chunking ablations (N) moved to V5 because they need the evaluation framework (R) to be meaningful.
 
 ### Checklist
 - [x] **I** — HyDE
-- [ ] **J** — Qdrant vector database
-- [ ] **K** — BM25 retrieval
+- [x] **K** — BM25 retrieval
 - [ ] **L** — Hybrid retrieval
 - [ ] **M** — Re-ranking
 
@@ -137,11 +136,12 @@ Atomic improvements that can be combined into future versions. Check off each it
 
 **Theme:** Turn the script into a real service you can benchmark and demo.
 
-**Why:** Once retrieval quality is established (V4), build the interface around it. Evaluation (R) gives a quantitative story; FastAPI (S) makes it demo-able; streaming (P) makes it feel live; memory (T) makes it useful as a chatbot. Metadata filtering (Q) enables scoped retrieval over specific documents.
+**Why:** Qdrant (J) replaces the FAISS + SQLite dual-store with a single service that handles vectors, metadata, and CRUD — and makes metadata filtering (Q) a first-class feature. With infrastructure and retrieval quality settled, the rest of V5 builds the interface: evaluation (R) gives a quantitative story; FastAPI (S) makes it demo-able; streaming (P) makes it feel live; memory (T) makes it useful as a chatbot.
 
 ### Checklist
-- [ ] **P** — Streaming LLM output
+- [ ] **J** — Qdrant vector database
 - [ ] **Q** — Metadata filtering
+- [ ] **P** — Streaming LLM output
 - [ ] **R** — Evaluation framework
 - [ ] **N** — Chunking strategy comparison (requires R)
 - [ ] **S** — FastAPI server
