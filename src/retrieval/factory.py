@@ -12,9 +12,25 @@ from src.chunking.chunk import chunk_documents
 from src.retrieval.retriever import Retriever
 from src.retrieval.retriever_bm25 import RetrieverBM25
 from src.retrieval.retriever_faiss import RetrieverFAISS
+from src.retrieval.retriever_hybrid import RetrieverHybrid
 from src.store.sqlite_store import ChunkStore
 
 logger = logging.getLogger(__name__)
+
+
+def build_hybrid_retriever(
+    data_path: str,
+    embedder: Embedder,
+    store: str = "numpy",
+    index_type: str = "flat",
+    fusion: str = "rrf",
+    alpha: float = 0.5,
+    k: int = 60,
+) -> RetrieverHybrid:
+    """Build a hybrid retriever combining dense and BM25, sharing the same embedder and caches."""
+    dense = build_retriever(store, data_path, embedder, index_type=index_type)
+    bm25 = build_bm25_retriever(data_path)
+    return RetrieverHybrid(dense, bm25, fusion=fusion, alpha=alpha, k=k)
 
 
 def build_bm25_retriever(data_path: str) -> RetrieverBM25:

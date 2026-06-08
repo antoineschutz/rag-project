@@ -3,7 +3,7 @@ import logging
 
 from src.config import config
 from src.embeddings.embed import Embedder
-from src.retrieval.factory import build_retriever, build_bm25_retriever
+from src.retrieval.factory import build_retriever, build_bm25_retriever, build_hybrid_retriever
 from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
 from src.llm.client import LLMClient
 
@@ -39,9 +39,21 @@ def main() -> None:
     )
     parser.add_argument(
         "--retriever",
-        choices=["dense", "bm25"],
+        choices=["dense", "bm25", "hybrid"],
         default="dense",
-        help="Retrieval method: dense (embedding-based) or bm25 (lexical, default: dense)",
+        help="Retrieval method: dense, bm25, or hybrid (default: dense)",
+    )
+    parser.add_argument(
+        "--fusion",
+        choices=["rrf", "weighted"],
+        default="rrf",
+        help="Fusion strategy for --retriever hybrid (default: rrf)",
+    )
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.5,
+        help="Dense weight for weighted sum fusion, between 0 and 1 (default: 0.5)",
     )
     parser.add_argument(
         "--hyde",
@@ -72,7 +84,6 @@ def main() -> None:
         results = retriever.retrieve(args.query, top_k=top_k)
     else:
         embedder = Embedder()
-        retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
 
         if args.hyde:
             from src.hyde.hyde import generate_hypothetical_doc
@@ -81,7 +92,16 @@ def main() -> None:
             embed_input = args.query
 
         query_embedding = embedder.embed_query(embed_input)
-        results = retriever.retrieve(query_embedding, top_k=top_k)
+
+        if args.retriever == "hybrid":
+            retriever = build_hybrid_retriever(
+                data_path, embedder, args.store, args.index_type,
+                fusion=args.fusion, alpha=args.alpha,
+            )
+            results = retriever.retrieve(args.query, query_embedding, top_k=top_k)
+        else:
+            retriever = build_retriever(args.store, data_path, embedder, index_type=args.index_type)
+            results = retriever.retrieve(query_embedding, top_k=top_k)
 
     contexts = [r["text"] for r in results]
     rag_prompt = build_prompt_rag(args.query, contexts)
