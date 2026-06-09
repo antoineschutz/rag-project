@@ -10,6 +10,7 @@ from src.config import config
 from src.embeddings.embed import Embedder
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
+from src.retrieval.cache_utils import cache_matches, clear_cache, write_cache_model
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ class RetrieverCosine:
 def build_cosine_retriever(data_path: str, embedder: Embedder) -> RetrieverCosine:
     """Build a cosine similarity retriever, loading embeddings from numpy cache if available."""
     os.makedirs(config.CACHE_DIR, exist_ok=True)
+    if not cache_matches(embedder.model_name):
+        logger.info("Embed model changed — clearing cache.")
+        clear_cache()
     if os.path.exists(config.EMBEDDINGS_PATH) and os.path.exists(config.CHUNKS_PATH):
         logger.info("Loading from numpy cache...")
         with open(config.CHUNKS_PATH) as f:
@@ -54,5 +58,6 @@ def build_cosine_retriever(data_path: str, embedder: Embedder) -> RetrieverCosin
         np.save(config.EMBEDDINGS_PATH, doc_embeddings)
         with open(config.CHUNKS_PATH, "w") as f:
             json.dump(chunked_docs, f, indent=4, ensure_ascii=False)
+        write_cache_model(embedder.model_name)
         logger.info("Embeddings saved to numpy cache.")
     return RetrieverCosine(chunked_docs, doc_embeddings)

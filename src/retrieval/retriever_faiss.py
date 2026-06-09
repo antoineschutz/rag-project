@@ -10,6 +10,7 @@ from src.embeddings.embed import Embedder
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
 from src.store.sqlite_store import ChunkStore
+from src.retrieval.cache_utils import cache_matches, clear_cache, write_cache_model
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,9 @@ def build_faiss_retriever(
 ) -> RetrieverFAISS:
     """Build a FAISS retriever, loading index and chunks from cache if available."""
     os.makedirs(config.CACHE_DIR, exist_ok=True)
+    if not cache_matches(embedder.model_name):
+        logger.info("Embed model changed — clearing cache.")
+        clear_cache()
     chunk_store = ChunkStore(config.SQLITE_DB_PATH)
     if os.path.exists(config.FAISS_INDEX_PATH) and chunk_store.exists():
         logger.info("Loading from FAISS + SQLite cache...")
@@ -87,5 +91,6 @@ def build_faiss_retriever(
     chunk_store.save(chunked_docs)
     retriever = RetrieverFAISS(chunked_docs, doc_embeddings, index_type=index_type)
     faiss.write_index(retriever.index, config.FAISS_INDEX_PATH)
+    write_cache_model(embedder.model_name)
     logger.info("Embeddings saved to FAISS + SQLite cache.")
     return retriever

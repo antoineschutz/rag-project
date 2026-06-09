@@ -13,12 +13,76 @@ from src.llm.client import LLMClient
 logger = logging.getLogger(__name__)
 
 
+def run_pipeline(
+    query: str,
+    data_path: str | None = None,
+    backend: str | None = None,
+    model: str | None = None,
+    embed_model: str | None = None,
+    top_k: int | None = None,
+    no_rag: bool = False,
+    store: str = "numpy",
+    index_type: str = "flat",
+    retriever: str = "dense",
+    fusion: str = "rrf",
+    alpha: float = 0.5,
+    rerank: bool = False,
+    hyde: bool = False,
+) -> str:
+    resolved_backend = backend or config.LLM_BACKEND
+    resolved_top_k = top_k or config.TOP_K
+    resolved_data_path = data_path or config.DATA_PATH
+
+    llm = LLMClient(backend=resolved_backend, model=model)
+
+    if no_rag:
+        return llm.generate(build_prompt_no_rag(query))
+
+    retrieval_k = resolved_top_k * 3 if rerank else resolved_top_k
+
+    if retriever == "bm25":
+        ret = build_bm25_retriever(resolved_data_path)
+        results = ret.retrieve(query, top_k=retrieval_k)
+    else:
+        embedder = Embedder(model_name=embed_model or config.EMBED_MODEL)
+
+        if hyde:
+            from src.hyde.hyde import generate_hypothetical_doc
+            embed_input = generate_hypothetical_doc(query, llm)
+        else:
+            embed_input = query
+
+        query_embedding = embedder.embed_query(embed_input)
+
+        if retriever == "hybrid":
+            ret = build_hybrid_retriever(
+                resolved_data_path, embedder, store, index_type,
+                fusion=fusion, alpha=alpha,
+            )
+            results = ret.retrieve(query, query_embedding, top_k=retrieval_k)
+        else:
+            if store == "faiss":
+                ret = build_faiss_retriever(resolved_data_path, embedder, index_type=index_type)
+            else:
+                ret = build_cosine_retriever(resolved_data_path, embedder)
+            results = ret.retrieve(query_embedding, top_k=retrieval_k)
+
+    if rerank:
+        from src.reranker.reranker import Reranker
+        results = Reranker().rerank(query, results, top_k=resolved_top_k)
+
+    contexts = [r["text"] for r in results]
+    return llm.generate(build_prompt_rag(query, contexts))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the RAG pipeline.")
     parser.add_argument("--query", required=True, help="Question to ask the model")
     parser.add_argument("--data-path", default=None, help="Path to PDF data directory")
     parser.add_argument("--backend", choices=["ollama", "gpt"], default=None, help="LLM backend")
     parser.add_argument("--model", default=None, help="Model name override")
+    parser.add_argument("--embed-model", default=None, dest="embed_model",
+                        help="Sentence-transformers embedding model (overrides config)")
     parser.add_argument("--top-k", type=int, default=None, dest="top_k", help="Number of chunks to retrieve")
     parser.add_argument("--no-rag", action="store_true", help="Skip retrieval; query LLM directly")
     parser.add_argument(
@@ -74,56 +138,22 @@ def main() -> None:
     for name in ("__main__", "src"):
         logging.getLogger(name).setLevel(args.log_level)
 
-    backend = args.backend or config.LLM_BACKEND
-    top_k = args.top_k or config.TOP_K
-    data_path = args.data_path or config.DATA_PATH
-
-    llm = LLMClient(backend=backend, model=args.model)
-
-    if args.no_rag:
-        prompt = build_prompt_no_rag(args.query)
-        answer = llm.generate(prompt)
-        print("ANSWER (no RAG)")
-        print(answer)
-        return
-
-    retrieval_k = top_k * 3 if args.rerank else top_k
-
-    if args.retriever == "bm25":
-        retriever = build_bm25_retriever(data_path)
-        results = retriever.retrieve(args.query, top_k=retrieval_k)
-    else:
-        embedder = Embedder()
-
-        if args.hyde:
-            from src.hyde.hyde import generate_hypothetical_doc
-            embed_input = generate_hypothetical_doc(args.query, llm)
-        else:
-            embed_input = args.query
-
-        query_embedding = embedder.embed_query(embed_input)
-
-        if args.retriever == "hybrid":
-            retriever = build_hybrid_retriever(
-                data_path, embedder, args.store, args.index_type,
-                fusion=args.fusion, alpha=args.alpha,
-            )
-            results = retriever.retrieve(args.query, query_embedding, top_k=retrieval_k)
-        else:
-            if args.store == "faiss":
-                retriever = build_faiss_retriever(data_path, embedder, index_type=args.index_type)
-            else:
-                retriever = build_cosine_retriever(data_path, embedder)
-            results = retriever.retrieve(query_embedding, top_k=retrieval_k)
-
-    if args.rerank:
-        from src.reranker.reranker import Reranker
-        results = Reranker().rerank(args.query, results, top_k=top_k)
-
-    contexts = [r["text"] for r in results]
-    rag_prompt = build_prompt_rag(args.query, contexts)
-
-    answer = llm.generate(rag_prompt)
+    answer = run_pipeline(
+        query=args.query,
+        data_path=args.data_path,
+        backend=args.backend,
+        model=args.model,
+        embed_model=args.embed_model,
+        top_k=args.top_k,
+        no_rag=args.no_rag,
+        store=args.store,
+        index_type=args.index_type,
+        retriever=args.retriever,
+        fusion=args.fusion,
+        alpha=args.alpha,
+        rerank=args.rerank,
+        hyde=args.hyde,
+    )
     print("\nANSWER:\n")
     print(answer)
 

@@ -71,7 +71,7 @@ Atomic improvements that can be combined into future versions. Check off each it
 - [x] **L — Hybrid retrieval** — combine BM25 and dense scores (RRF or weighted sum) *(Medium — Hybrid search, score fusion)*
 - [x] **M — Re-ranking** — add a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score top-k results *(Medium — Cross-encoders, two-stage retrieval)*
 ### V5
-- [ ] **R — Evaluation pipeline** — run all config dimensions against the 32 Q/A pairs in `docs/eval_qa_pairs.md`: RAG vs no-RAG, chunking strategy (naive/sentence/tiktoken), retrieval method (dense/BM25/hybrid), fusion strategy (RRF vs weighted sum), reranking (on/off), and embedding model (all-MiniLM-L6-v2, bge-small-en, e5-small); report answers side-by-side per comparison dimension for manual review *(Medium — Evaluation, ablation studies)*
+- [ ] **R — Evaluation pipeline** — run all config dimensions against the 32 Q/A pairs in `docs/eval_qa_pairs.md`: RAG vs no-RAG, retrieval method (dense/BM25/hybrid), fusion strategy (RRF vs weighted sum), reranking (on/off), and embedding model (all-MiniLM-L6-v2, bge-small-en, e5-small); report answers side-by-side per comparison dimension for manual review *(Medium — Evaluation, ablation studies)*
 - [ ] **O — MCQ benchmark + MLflow** — handcraft a fictional universe PDF (10-15 pages with tables, named entities, dates, multi-section content) and 20-30 MCQ questions whose answers require retrieval to get right; run all config dimensions against the MCQ set; score by % accuracy; log accuracy and per-stage latency to MLflow for cross-run comparison *(Medium — MCQ benchmarking, MLflow, experiment tracking)*
 
 ### V6
