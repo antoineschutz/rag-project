@@ -37,7 +37,7 @@ class LLMClient:
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}]
                 )
-                return response["message"]["content"]
+                return response.message.content or ""
             except Exception as e:
                 raise RuntimeError(
                     f"Ollama request failed — is Ollama running with model '{self.model}' pulled? ({e})"

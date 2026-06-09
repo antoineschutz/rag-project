@@ -81,6 +81,7 @@ def chunk_text_tiktoken(
     max_tokens: int = config.CHUNK_MAX_TOKENS,
     overlap_tokens: int = config.CHUNK_OVERLAP,
 ) -> list[str]:
+    overlap_tokens = min(overlap_tokens, max_tokens // 2)
     """Tiktoken-based chunker with overlap, treating markdown table blocks as atomic units.
 
     Table blocks (lines starting with '|') are never split and are emitted as
@@ -152,7 +153,7 @@ def chunk_documents(
     overlap_tokens: int | None = None,
 ) -> list[dict[str, str]]:
     """Apply tiktoken chunking to each document, propagating the source field to every chunk."""
-    kwargs: dict = {}
+    kwargs: dict[str, int] = {}
     if chunk_max_tokens is not None:
         kwargs["max_tokens"] = chunk_max_tokens
     if overlap_tokens is not None:

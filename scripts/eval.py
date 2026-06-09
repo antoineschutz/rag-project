@@ -353,7 +353,7 @@ def main() -> None:
     group.add_argument("--all", action="store_true", help="Run all dimensions sequentially")
     args = parser.parse_args()
 
-    shutil.rmtree("cache", ignore_errors=True)
+    shutil.rmtree(Path(__file__).parent.parent / "cache", ignore_errors=True)
 
     dims = list(DIMENSIONS.keys()) if args.all else [args.dimension]
     timings: list[tuple[str, float]] = []
