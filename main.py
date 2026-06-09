@@ -28,6 +28,7 @@ def run_pipeline(
     alpha: float = 0.5,
     rerank: bool = False,
     hyde: bool = False,
+    embedder: Embedder | None = None,
 ) -> str:
     resolved_backend = backend or config.LLM_BACKEND
     resolved_top_k = top_k or config.TOP_K
@@ -44,7 +45,8 @@ def run_pipeline(
         ret = build_bm25_retriever(resolved_data_path)
         results = ret.retrieve(query, top_k=retrieval_k)
     else:
-        embedder = Embedder(model_name=embed_model or config.EMBED_MODEL)
+        if embedder is None:
+            embedder = Embedder(model_name=embed_model or config.EMBED_MODEL)
 
         if hyde:
             from src.hyde.hyde import generate_hypothetical_doc

@@ -7,6 +7,8 @@ Usage:
 """
 
 import argparse
+import hashlib
+import json
 import logging
 import sys
 from pathlib import Path
@@ -16,11 +18,28 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import config
+from src.embeddings.embed import Embedder
 from main import run_pipeline
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
 
 OUT_DIR = Path("eval_results")
+CACHE_FILE = OUT_DIR / ".llm_cache.json"
+
+
+def _cache_key(query: str, cfg: dict) -> str:
+    payload = json.dumps({"query": query, "cfg": cfg}, sort_keys=True)
+    return hashlib.md5(payload.encode()).hexdigest()
+
+
+def _load_cache() -> dict[str, str]:
+    if CACHE_FILE.exists():
+        return json.loads(CACHE_FILE.read_text())
+    return {}
+
+
+def _save_cache(cache: dict[str, str]) -> None:
+    CACHE_FILE.write_text(json.dumps(cache, indent=2))
 
 # ---------------------------------------------------------------------------
 # Q/A pairs — fill in question / expected / source before running
@@ -78,7 +97,7 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
             {"no_rag": True},
         ],
@@ -88,15 +107,15 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
             {
                 "no_rag": False, "retriever": "bm25",
-                "rerank": False, "top_k": 5,
+                "rerank": False, "top_k": 15,
             },
             {
                 "no_rag": False, "retriever": "hybrid", "fusion": "rrf", "alpha": 0.5,
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
         ],
     },
@@ -105,11 +124,11 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         "configs": [
             {
                 "no_rag": False, "retriever": "hybrid", "fusion": "rrf", "alpha": 0.5,
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
             {
                 "no_rag": False, "retriever": "hybrid", "fusion": "weighted", "alpha": 0.5,
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
         ],
     },
@@ -118,11 +137,11 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "all-MiniLM-L6-v2", "rerank": True, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": True, "top_k": 15,
             },
         ],
     },
@@ -131,15 +150,32 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "BAAI/bge-small-en-v1.5", "rerank": False, "top_k": 15,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "intfloat/e5-small-v2", "rerank": False, "top_k": 15,
+            },
+        ],
+    },
+    "top_k": {
+        "labels": ["top_k=5", "top_k=15", "top_k=20"],
+        "configs": [
+            {
+                "no_rag": False, "retriever": "dense",
                 "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 5,
             },
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "BAAI/bge-small-en-v1.5", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
             },
             {
                 "no_rag": False, "retriever": "dense",
-                "embed_model": "intfloat/e5-small-v2", "rerank": False, "top_k": 5,
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 20,
             },
         ],
     },
@@ -203,21 +239,38 @@ def run_dimension(name: str, labels: list[str], configs: list[dict]) -> None:
 
     model = config.OLLAMA_MODEL if config.LLM_BACKEND == "ollama" else config.OPENAI_MODEL
 
+    # answers_matrix[q_idx][cfg_idx]
+    answers_matrix: list[list[str]] = [[""] * len(configs) for _ in active]
+    cache = _load_cache()
+
+    for i, cfg in enumerate(configs):
+        needs_embedder = not cfg.get("no_rag") and cfg.get("retriever", "dense") != "bm25"
+        embedder: Embedder | None = None
+
+        for j, qa in enumerate(active):
+            key = _cache_key(qa["question"], cfg)
+            if key in cache:
+                print(f"    Q{qa['id']} [{labels[i]}] (cached)", flush=True)
+                answers_matrix[j][i] = cache[key]
+                continue
+
+            if embedder is None and needs_embedder:
+                print(f"\n  [{labels[i]}] loading embedder...", flush=True)
+                embedder = Embedder(cfg.get("embed_model") or config.EMBED_MODEL)
+
+            print(f"    Q{qa['id']} (level {qa['level']}) [{labels[i]}]...", flush=True)
+            ans = run_pipeline(qa["question"], embedder=embedder, **cfg)
+            answers_matrix[j][i] = ans
+            cache[key] = ans
+            _save_cache(cache)
+
     with open(out_path, "w") as f:
         f.write(f"# {name}\n\n")
         f.write(f"**backend:** {config.LLM_BACKEND} · **model:** {model}\n\n")
         f.write(_config_summary(labels, configs))
         f.write("\n\n---\n")
-
-        for qa in active:
-            print(f"  Q{qa['id']} (level {qa['level']})...", flush=True)
-            answers = []
-            for i, cfg in enumerate(configs):
-                ans = run_pipeline(qa["question"], **cfg)
-                answers.append(ans)
-                print(f"    [{labels[i]}] done", flush=True)
-            _write_question(f, qa, labels, answers)
-            f.flush()
+        for j, qa in enumerate(active):
+            _write_question(f, qa, labels, answers_matrix[j])
 
     print(f"  -> {out_path}")
 
