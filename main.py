@@ -29,6 +29,7 @@ def run_pipeline(
     rerank: bool = False,
     hyde: bool = False,
     embedder: Embedder | None = None,
+    chunk_max_tokens: int | None = None,
 ) -> str:
     resolved_backend = backend or config.LLM_BACKEND
     resolved_top_k = top_k or config.TOP_K
@@ -42,7 +43,7 @@ def run_pipeline(
     retrieval_k = resolved_top_k * 3 if rerank else resolved_top_k
 
     if retriever == "bm25":
-        ret = build_bm25_retriever(resolved_data_path)
+        ret = build_bm25_retriever(resolved_data_path, chunk_max_tokens=chunk_max_tokens)
         results = ret.retrieve(query, top_k=retrieval_k)
     else:
         if embedder is None:
@@ -59,14 +60,14 @@ def run_pipeline(
         if retriever == "hybrid":
             ret = build_hybrid_retriever(
                 resolved_data_path, embedder, store, index_type,
-                fusion=fusion, alpha=alpha,
+                fusion=fusion, alpha=alpha, chunk_max_tokens=chunk_max_tokens,
             )
             results = ret.retrieve(query, query_embedding, top_k=retrieval_k)
         else:
             if store == "faiss":
-                ret = build_faiss_retriever(resolved_data_path, embedder, index_type=index_type)
+                ret = build_faiss_retriever(resolved_data_path, embedder, index_type=index_type, chunk_max_tokens=chunk_max_tokens)
             else:
-                ret = build_cosine_retriever(resolved_data_path, embedder)
+                ret = build_cosine_retriever(resolved_data_path, embedder, chunk_max_tokens=chunk_max_tokens)
             results = ret.retrieve(query_embedding, top_k=retrieval_k)
 
     if rerank:

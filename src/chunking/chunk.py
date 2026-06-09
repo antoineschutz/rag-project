@@ -146,10 +146,19 @@ def chunk_text_tiktoken(
     return chunks
 
 
-def chunk_documents(docs: list[dict[str, str]]) -> list[dict[str, str]]:
+def chunk_documents(
+    docs: list[dict[str, str]],
+    chunk_max_tokens: int | None = None,
+    overlap_tokens: int | None = None,
+) -> list[dict[str, str]]:
     """Apply tiktoken chunking to each document, propagating the source field to every chunk."""
+    kwargs: dict = {}
+    if chunk_max_tokens is not None:
+        kwargs["max_tokens"] = chunk_max_tokens
+    if overlap_tokens is not None:
+        kwargs["overlap_tokens"] = overlap_tokens
     chunked_docs = []
     for doc in docs:
-        for chunk in chunk_text_tiktoken(doc["text"]):
+        for chunk in chunk_text_tiktoken(doc["text"], **kwargs):
             chunked_docs.append({"text": chunk, "source": doc["source"]})
     return chunked_docs

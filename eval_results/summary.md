@@ -270,18 +270,6 @@
 | top_k = 20 | 14 | 44% |
 
 ---
-
-## Overall Takeaways
-
-**What moves the needle:**
-- **Embed model** is the biggest lever — bge-small (47%) beats MiniLM (31%) by 16 points. It retrieves the right chunks for table and benchmark questions that MiniLM misses entirely.
-- **top_k** is equally important — k=20 (44%) beats k=5 (25%) by 19 points. The model can use wider context especially for table and equation questions.
-
-**What doesn't move the needle:**
-- **Retrieval method** (dense/bm25/hybrid) is within ±3% — no meaningful difference at this corpus size.
-- **Reranking** gives +3% at most, within noise.
-- **Fusion strategy** (rrf vs weighted) makes zero difference.
-
 **Per-question difficulty across all configs:**
 
 There are 11 unique configs (deduplication note: the dense baseline appears in 4 dimensions — rag_vs_norag "RAG", retrieval "dense", reranking "no-rerank", embed_model "MiniLM" — counted once; hybrid-rrf appears in both retrieval and fusion — counted once).
@@ -320,3 +308,50 @@ There are 11 unique configs (deduplication note: the dense baseline appears in 4
 | Q30 | L8 | 0/11 | 0% | Cross-paper comparison (RAG vs DPR scores) — requires synthesizing facts from two separate PDFs simultaneously. No config succeeds. |
 | Q31 | L8 | 0/11 | 0% | Head count difference (BERT-LARGE 16 − BERT-BASE 8 = 4) — requires reading two rows from the architecture table and subtracting. No config succeeds. |
 | Q32 | L8 | 0/11 | 0% | Cross-paper REALM vs RAG comparison (45.2 vs 40.7, +4.5) — requires cross-document retrieval. Every config hallucinates or refuses. |
+
+---
+
+## Round 2 — What changed and what we're testing next
+
+### What Round 1 told us
+
+Two dimensions drove almost all the variance:
+
+- **`embed_model`** — the retriever sees completely different candidate sets depending on the embedding model; stronger models put the right chunk in the top-k more reliably.
+- **`top_k`** — many correct answers were in the corpus but fell outside a narrow retrieval window; k=20 was noticeably better than k=5 and k=15, and the curve had not yet flattened.
+
+Three dimensions were essentially flat: retrieval method (dense / BM25 / hybrid), reranking, and fusion strategy. These are re-run in Round 2 to measure the isolated impact of the extraction fix, but no further variation is planned for them.
+
+### The table extraction bug
+
+Q20–Q23 all scored 0/11 — every config failed. Inspection with `show_chunks.py` revealed the root cause: Table 2 from *Attention Is All You Need* (EN-DE / EN-FR BLEU results) was not detected as a table at all.
+
+It uses LaTeX booktabs style — only horizontal rules (`\toprule`, `\midrule`, `\bottomrule`), no vertical lines. `pdfplumber`'s default detector requires a grid with both axes and returned nothing. The content fell through to body-text extraction as a flat string, then `chunk_text_tiktoken` split it at the 128-token boundary mid-row. The second chunk started with `.03 40.56 2.0 ·` — orphaned numbers with no column context, producing a semantically useless embedding that ranked ~20th for any query about those scores. Q22 (BERT GLUE table) failed for the same reason.
+
+### Fixes applied
+
+1. **`_find_booktabs_tables()` in `loader.py`**: second-pass detector for tables with only wide horizontal rules (≥55% page width). Reconstructs explicit column boundaries from word x0 clustering. Called as fallback when the default border-based detector finds nothing.
+
+2. **`_split_table_blocks()` in `chunk.py`**: lines starting with `|` are emitted as a single atomic chunk regardless of token count, so no table is ever split mid-row.
+
+After these fixes: Q7 (markdown table), Q20 (EN-FR BLEU), Q21 (training FLOPs), and Q22 (BERT GLUE QQP) all have their answer in a single properly-structured markdown chunk. Q23 remains broken — the REALM results table has no horizontal lines at all, so the booktabs detector finds nothing. Q29–Q32 are unaffected — they require equation parsing or cross-document synthesis.
+
+### Round 2 plan
+
+Every dimension from Round 1 is re-run with the fixed pipeline so scores are directly comparable. Two dimensions are extended and one is added:
+
+| Dimension | Round 1 | Round 2 | Change |
+|-----------|---------|---------|--------|
+| `rag_vs_norag` | RAG, no-RAG | same | rerun — extraction fix |
+| `retrieval` | dense, bm25, hybrid-rrf | same | rerun — extraction fix |
+| `reranking` | no rerank, rerank | same | rerun — extraction fix |
+| `fusion` | rrf, weighted | same | rerun — extraction fix |
+| `embed_model` | MiniLM-L6, bge-small, e5-small | + bge-base, bge-large | extended — stronger models |
+| `top_k` | 5, 15, 20 | 5, 15, 20, 30, 40, 60, 80, 100 | extended — find the saturation point |
+| `chunk_max_tokens` | — | 64, 128, 256, 512, 1024 | new — find optimal chunk granularity |
+
+**New embedding models**: `BAAI/bge-base-en-v1.5` (109M params) and `BAAI/bge-large-en-v1.5` (335M params) are both larger and higher-ranked on MTEB than the three Round 1 models.
+
+**Extended top_k**: k=20 was the best in Round 1 but the curve had not flattened. Testing up to k=100 (roughly 10% of the corpus) will show where retrieval recall saturates and whether more context starts hurting generation quality.
+
+**New chunk_max_tokens**: 128 tokens is the current default. Smaller chunks (64) may improve embedding precision but risk splitting table rows even after the fix; larger chunks (256–1024) give the embedder more context per vector but may dilute the signal. Model (MiniLM-L6) and k=15 are held constant to isolate the effect.

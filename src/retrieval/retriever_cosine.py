@@ -40,11 +40,17 @@ class RetrieverCosine:
         return results
 
 
-def build_cosine_retriever(data_path: str, embedder: Embedder) -> RetrieverCosine:
+def build_cosine_retriever(
+    data_path: str,
+    embedder: Embedder,
+    chunk_max_tokens: int | None = None,
+) -> RetrieverCosine:
     """Build a cosine similarity retriever, loading embeddings from numpy cache if available."""
+    effective_chunk_size = chunk_max_tokens or config.CHUNK_MAX_TOKENS
+    stamp = f"{embedder.model_name}:{effective_chunk_size}"
     os.makedirs(config.CACHE_DIR, exist_ok=True)
-    if not cache_matches(embedder.model_name):
-        logger.info("Embed model changed — clearing cache.")
+    if not cache_matches(stamp):
+        logger.info("Cache stamp changed — clearing cache.")
         clear_cache()
     if os.path.exists(config.EMBEDDINGS_PATH) and os.path.exists(config.CHUNKS_PATH):
         logger.info("Loading from numpy cache...")
@@ -53,11 +59,11 @@ def build_cosine_retriever(data_path: str, embedder: Embedder) -> RetrieverCosin
         doc_embeddings = np.load(config.EMBEDDINGS_PATH)
     else:
         docs = load_documents(data_path)
-        chunked_docs = chunk_documents(docs)
+        chunked_docs = chunk_documents(docs, chunk_max_tokens=effective_chunk_size)
         doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
         np.save(config.EMBEDDINGS_PATH, doc_embeddings)
         with open(config.CHUNKS_PATH, "w") as f:
             json.dump(chunked_docs, f, indent=4, ensure_ascii=False)
-        write_cache_model(embedder.model_name)
+        write_cache_model(stamp)
         logger.info("Embeddings saved to numpy cache.")
     return RetrieverCosine(chunked_docs, doc_embeddings)

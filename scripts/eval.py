@@ -10,7 +10,9 @@ import argparse
 import hashlib
 import json
 import logging
+import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +25,7 @@ from main import run_pipeline
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
 
-OUT_DIR = Path("eval_results")
+OUT_DIR = Path("eval_results2")
 CACHE_FILE = OUT_DIR / ".llm_cache.json"
 
 
@@ -146,7 +148,7 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
         ],
     },
     "embed_model": {
-        "labels": ["all-MiniLM-L6-v2", "bge-small-en", "e5-small"],
+        "labels": ["all-MiniLM-L6-v2", "bge-small-en", "e5-small", "bge-base", "bge-large"],
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
@@ -160,10 +162,18 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
                 "no_rag": False, "retriever": "dense",
                 "embed_model": "intfloat/e5-small-v2", "rerank": False, "top_k": 15,
             },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "BAAI/bge-base-en-v1.5", "rerank": False, "top_k": 15,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "BAAI/bge-large-en-v1.5", "rerank": False, "top_k": 15,
+            },
         ],
     },
     "top_k": {
-        "labels": ["top_k=5", "top_k=15", "top_k=20"],
+        "labels": ["top_k=5", "top_k=15", "top_k=20", "top_k=30", "top_k=40", "top_k=60", "top_k=80", "top_k=100"],
         "configs": [
             {
                 "no_rag": False, "retriever": "dense",
@@ -176,6 +186,56 @@ DIMENSIONS: dict[str, dict[str, Any]] = {
             {
                 "no_rag": False, "retriever": "dense",
                 "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 20,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 30,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 40,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 60,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 80,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 100,
+            },
+        ],
+    },
+    "chunk_max_tokens": {
+        "labels": ["tokens=64", "tokens=128", "tokens=256", "tokens=512", "tokens=1024"],
+        "configs": [
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+                "chunk_max_tokens": 64,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+                "chunk_max_tokens": 128,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+                "chunk_max_tokens": 256,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+                "chunk_max_tokens": 512,
+            },
+            {
+                "no_rag": False, "retriever": "dense",
+                "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
+                "chunk_max_tokens": 1024,
             },
         ],
     },
@@ -196,7 +256,7 @@ def _config_summary(labels: list[str], configs: list[dict]) -> str:
     rows = ["| Parameter | " + " | ".join(labels) + " |"]
     rows.append("|-----------|" + "|".join(["--------"] * len(labels)) + "|")
 
-    keys = ["retriever", "embed_model", "fusion", "alpha", "rerank", "top_k", "no_rag"]
+    keys = ["retriever", "embed_model", "fusion", "alpha", "rerank", "top_k", "no_rag", "chunk_max_tokens"]
     for k in keys:
         values = [str(cfg.get(k, "—")) for cfg in configs]
         if len(set(values)) > 1 or any(v != "—" for v in values):
@@ -243,9 +303,11 @@ def run_dimension(name: str, labels: list[str], configs: list[dict]) -> None:
     answers_matrix: list[list[str]] = [[""] * len(configs) for _ in active]
     cache = _load_cache()
 
+    cfg_times: list[float] = []
     for i, cfg in enumerate(configs):
         needs_embedder = not cfg.get("no_rag") and cfg.get("retriever", "dense") != "bm25"
         embedder: Embedder | None = None
+        cfg_t0 = time.time()
 
         for j, qa in enumerate(active):
             key = _cache_key(qa["question"], cfg)
@@ -264,6 +326,10 @@ def run_dimension(name: str, labels: list[str], configs: list[dict]) -> None:
             cache[key] = ans
             _save_cache(cache)
 
+        cfg_elapsed = time.time() - cfg_t0
+        cfg_times.append(cfg_elapsed)
+        print(f"  [{labels[i]}] done in {cfg_elapsed:.0f}s", flush=True)
+
     with open(out_path, "w") as f:
         f.write(f"# {name}\n\n")
         f.write(f"**backend:** {config.LLM_BACKEND} · **model:** {model}\n\n")
@@ -271,6 +337,11 @@ def run_dimension(name: str, labels: list[str], configs: list[dict]) -> None:
         f.write("\n\n---\n")
         for j, qa in enumerate(active):
             _write_question(f, qa, labels, answers_matrix[j])
+        f.write("\n\n---\n\n## Runtime\n\n")
+        f.write("| Config | Time |\n|--------|------|\n")
+        for label, t in zip(labels, cfg_times):
+            f.write(f"| {label} | {t/60:.1f} min |\n")
+        f.write(f"| **total** | **{sum(cfg_times)/60:.1f} min** |\n")
 
     print(f"  -> {out_path}")
 
@@ -282,10 +353,25 @@ def main() -> None:
     group.add_argument("--all", action="store_true", help="Run all dimensions sequentially")
     args = parser.parse_args()
 
+    shutil.rmtree("cache", ignore_errors=True)
+
     dims = list(DIMENSIONS.keys()) if args.all else [args.dimension]
+    timings: list[tuple[str, float]] = []
+    total_t0 = time.time()
     for name in dims:
         d = DIMENSIONS[name]
+        t0 = time.time()
         run_dimension(name, d["labels"], d["configs"])
+        elapsed = time.time() - t0
+        timings.append((name, elapsed))
+        print(f"  [{name}] total: {elapsed:.0f}s ({elapsed/60:.1f}min)", flush=True)
+
+    if len(timings) > 1:
+        total = time.time() - total_t0
+        print(f"\n=== Runtime summary ===")
+        for name, elapsed in timings:
+            print(f"  {name:<20} {elapsed/60:6.1f} min")
+        print(f"  {'TOTAL':<20} {total/60:6.1f} min")
 
 
 if __name__ == "__main__":

@@ -114,11 +114,12 @@ def build_hybrid_retriever(
     fusion: str = "rrf",
     alpha: float = 0.5,
     k: int = 60,
+    chunk_max_tokens: int | None = None,
 ) -> RetrieverHybrid:
     """Build a hybrid retriever combining a dense backend and BM25."""
     if store == "faiss":
-        dense = build_faiss_retriever(data_path, embedder, index_type=index_type)
+        dense = build_faiss_retriever(data_path, embedder, index_type=index_type, chunk_max_tokens=chunk_max_tokens)
     else:
-        dense = build_cosine_retriever(data_path, embedder)
-    bm25 = build_bm25_retriever(data_path)
+        dense = build_cosine_retriever(data_path, embedder, chunk_max_tokens=chunk_max_tokens)
+    bm25 = build_bm25_retriever(data_path, chunk_max_tokens=chunk_max_tokens)
     return RetrieverHybrid(dense, bm25, fusion=fusion, alpha=alpha, k=k)

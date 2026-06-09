@@ -73,11 +73,14 @@ def build_faiss_retriever(
     data_path: str,
     embedder: Embedder,
     index_type: str = "flat",
+    chunk_max_tokens: int | None = None,
 ) -> RetrieverFAISS:
     """Build a FAISS retriever, loading index and chunks from cache if available."""
+    effective_chunk_size = chunk_max_tokens or config.CHUNK_MAX_TOKENS
+    stamp = f"{embedder.model_name}:{effective_chunk_size}"
     os.makedirs(config.CACHE_DIR, exist_ok=True)
-    if not cache_matches(embedder.model_name):
-        logger.info("Embed model changed — clearing cache.")
+    if not cache_matches(stamp):
+        logger.info("Cache stamp changed — clearing cache.")
         clear_cache()
     chunk_store = ChunkStore(config.SQLITE_DB_PATH)
     if os.path.exists(config.FAISS_INDEX_PATH) and chunk_store.exists():
@@ -86,11 +89,11 @@ def build_faiss_retriever(
         index = faiss.read_index(config.FAISS_INDEX_PATH)
         return RetrieverFAISS.from_index(chunked_docs, index)
     docs = load_documents(data_path)
-    chunked_docs = chunk_documents(docs)
+    chunked_docs = chunk_documents(docs, chunk_max_tokens=effective_chunk_size)
     doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
     chunk_store.save(chunked_docs)
     retriever = RetrieverFAISS(chunked_docs, doc_embeddings, index_type=index_type)
     faiss.write_index(retriever.index, config.FAISS_INDEX_PATH)
-    write_cache_model(embedder.model_name)
+    write_cache_model(stamp)
     logger.info("Embeddings saved to FAISS + SQLite cache.")
     return retriever

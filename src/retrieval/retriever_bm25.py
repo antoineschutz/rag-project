@@ -36,8 +36,11 @@ class RetrieverBM25:
         ]
 
 
-def build_bm25_retriever(data_path: str) -> RetrieverBM25:
+def build_bm25_retriever(
+    data_path: str,
+    chunk_max_tokens: int | None = None,
+) -> RetrieverBM25:
     """Load and chunk documents, then build a BM25 index. No embeddings or cache needed."""
     docs = load_documents(data_path)
-    chunked = chunk_documents(docs)
+    chunked = chunk_documents(docs, chunk_max_tokens=chunk_max_tokens)
     return RetrieverBM25(chunked)
