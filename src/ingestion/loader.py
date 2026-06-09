@@ -145,10 +145,129 @@ def _find_footnote_top(page: pdfplumber.pdf.Page) -> float:
     return page.height
 
 
+def _is_plausible_table(rows: list[list]) -> bool:
+    """Return True if an extracted table looks like real tabular data and not mis-detected body text.
+
+    Requires at least 3 rows, at least 3 columns, and an average cell length under 80 chars.
+    Average (not max) is used because merged cells in booktabs tables can be long,
+    but the overall average still stays well below prose sentence lengths.
+    """
+    if len(rows) < 3 or not rows[0] or len(rows[0]) < 3:
+        return False
+    cells = [str(c or "") for row in rows for c in row if c]
+    if not cells:
+        return False
+    return (sum(len(c) for c in cells) / len(cells)) < 80
+
+
+def _column_boundaries_from_words(words: list[dict], page_width: float) -> list[float]:
+    """Infer column x-boundaries from word x0 positions using gap detection.
+
+    Uses x_tolerance=5 word groupings; treats gaps > 24 pt as column separators.
+    Returns a list of x boundary values suitable for explicit_vertical_lines.
+    """
+    if not words:
+        return []
+    xs = sorted({round(w["x0"]) for w in words})
+    col_starts = [xs[0]]
+    for i in range(1, len(xs)):
+        if xs[i] - xs[i - 1] > 24:
+            col_starts.append(xs[i])
+    if len(col_starts) < 2:
+        return []
+    x_min = min(w["x0"] for w in words) - 5
+    x_max = max(w["x1"] for w in words) + 5
+    boundaries = [x_min]
+    for i in range(len(col_starts) - 1):
+        # Boundary sits in the gap between current column's last x0 and next column's first x0
+        boundaries.append((col_starts[i + 1] - 5))
+    boundaries.append(x_max)
+    return boundaries
+
+
+def _find_booktabs_tables(page: pdfplumber.pdf.Page) -> list:
+    """Detect LaTeX booktabs-style tables that have only horizontal rules and no vertical lines.
+
+    Groups horizontal rules that span >= 55% of page width into table regions,
+    then builds explicit vertical column boundaries from data-row word x0 clustering
+    (spanning header rows above the first midrule are excluded from column detection).
+    """
+    page_width = page.width
+    wide_rules = sorted(
+        [ln for ln in page.lines
+         if (ln["x1"] - ln["x0"]) / page_width >= 0.55 and ln["height"] < 2],
+        key=lambda ln: ln["top"],
+    )
+    if len(wide_rules) < 2:
+        return []
+
+    # Group consecutive rules within 200 pt of each other into one table region
+    groups: list[list[dict]] = []
+    current = [wide_rules[0]]
+    for rule in wide_rules[1:]:
+        if rule["top"] - current[-1]["top"] < 200:
+            current.append(rule)
+        else:
+            groups.append(current)
+            current = [rule]
+    groups.append(current)
+
+    tables = []
+    for group in groups:
+        if len(group) < 2:
+            continue
+        top = group[0]["top"] - 3
+        bottom = group[-1]["top"] + 3
+        h_lines = [r["top"] for r in group]
+
+        all_words = page.extract_words(x_tolerance=5, y_tolerance=3)
+        words_in_region = [w for w in all_words if top < w["top"] < bottom]
+        if not words_in_region:
+            continue
+
+        # Exclude spanning header rows (above the first midrule) from column detection
+        # so multi-column headers don't corrupt the column boundary inference.
+        data_top = group[1]["top"] if len(group) > 1 else group[0]["top"]
+        data_words = [w for w in words_in_region if w["top"] > data_top]
+        col_words = data_words if data_words else words_in_region
+
+        v_lines = _column_boundaries_from_words(col_words, page_width)
+        if len(v_lines) < 3:  # need at least 2 columns
+            continue
+
+        # Add text-row y-positions as extra horizontal lines so each logical row
+        # gets its own table row (booktabs rules only mark section boundaries).
+        row_ys = sorted({round(w["top"] / 3) * 3 for w in data_words})
+        row_boundaries: list[float] = sorted(set(h_lines))
+        for y in row_ys:
+            if not any(abs(y - h) < 5 for h in row_boundaries):
+                row_boundaries.append(y - 2)
+        row_boundaries = sorted(row_boundaries)
+
+        candidates = page.find_tables(table_settings={
+            "vertical_strategy": "explicit",
+            "horizontal_strategy": "explicit",
+            "explicit_vertical_lines": v_lines,
+            "explicit_horizontal_lines": row_boundaries,
+        })
+        for t in candidates:
+            if _is_plausible_table(t.extract()):
+                tables.append(t)
+    return tables
+
+
+def _find_tables(page: pdfplumber.pdf.Page) -> list:
+    """Detect tables: border-based first, then booktabs-style fallback."""
+    tables = page.find_tables()
+    if not tables:
+        tables = _find_booktabs_tables(page)
+    return tables
+
+
 def _extract_page_text(page: pdfplumber.pdf.Page) -> str:
     """Extract one pdfplumber page: bordered tables as Markdown, body text in reading-column order, headers prefixed ##."""
     # Phase 1: tables
-    tables = page.find_tables()
+    tables = _find_tables(page)
     table_bboxes = [t.bbox for t in tables]
     table_mds = [_table_to_markdown(t.extract()) for t in tables]
 

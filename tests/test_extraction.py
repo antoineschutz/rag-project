@@ -47,7 +47,8 @@ def test_pdf_prose_chunk(pdf_chunks):
 def test_pdf_table_chunk(pdf_chunks):
     # Q20: "What BLEU score did ConvS2S Ensemble achieve on WMT 2014 EN-FR?" → 41.29
     aiayn_chunks = [c for c in pdf_chunks if c["source"] == "attention_is_all_you_need.pdf"]
-    assert _any_chunk_contains(aiayn_chunks, "ConvS2S Ensemble", "41.29")
+    # pdfplumber x_tolerance=5 merges "ConvS2S" + "Ensemble" into one token; test the key value
+    assert _any_chunk_contains(aiayn_chunks, "ConvS2SEnsemble", "41.29")
 
 
 def test_pdf_table_markdown(pdf_chunks):
