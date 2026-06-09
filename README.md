@@ -17,7 +17,7 @@ Data flows linearly through five stages:
 **Requirements:** Python 3.9+, and either [Ollama](https://ollama.com) running locally or an OpenAI API key.
 
 ```bash
-git clone git@github.com:antoineschutz/rag-project.git
+git clone https://github.com/antoineschutz/rag-project.git
 cd rag-project
 
 python -m venv venv
