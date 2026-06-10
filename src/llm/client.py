@@ -35,7 +35,8 @@ class LLMClient:
                 import ollama
                 response = ollama.chat(
                     model=self.model,
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
+                    options={"temperature": 0},
                 )
                 return response.message.content or ""
             except Exception as e:
