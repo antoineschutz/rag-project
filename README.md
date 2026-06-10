@@ -1,20 +1,20 @@
 # RAG Pipeline
 
-A from-scratch RAG (Retrieval-Augmented Generation) pipeline — no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
+A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
 
 ## Architecture
 
 Data flows linearly through five stages:
 
-1. **Ingestion** — loads PDFs, Markdown, and DOCX files from `./data/`
-2. **Chunking** — sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens per chunk, 50-token overlap
-3. **Embedding** — `all-MiniLM-L6-v2` via `sentence-transformers`
-4. **Retrieval** — dense cosine (numpy or FAISS), BM25 lexical search, or hybrid fusion of both; optional cross-encoder re-ranking on top
-5. **Generation** — dispatches to Ollama (local) or OpenAI
+1. **Ingestion**: layout-aware extraction with `pdfplumber` (multi-column reading order; tables, including borderless/booktabs tables, rendered as Markdown), plus Markdown and DOCX, from `./data/`
+2. **Chunking**: sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens / 50-token overlap. Tables are kept atomic (never split mid-row) and bundled with surrounding prose when they fit
+3. **Embedding**: `sentence-transformers`, model swappable via `--embed-model` (`all-MiniLM-L6-v2` default; `bge-*`, `e5-*` supported)
+4. **Retrieval**: dense cosine (numpy or FAISS), BM25 lexical, or hybrid fusion. Optional cross-encoder re-ranking and HyDE query expansion on top
+5. **Generation**: Ollama (local) or OpenAI, with a configurable context window (`num_ctx`)
 
 ## Setup
 
-**Requirements:** Python 3.9+, and either [Ollama](https://ollama.com) running locally or an OpenAI API key.
+**Requirements:** Python 3.10+, and either [Ollama](https://ollama.com) running locally or an OpenAI API key.
 
 ```bash
 git clone https://github.com/antoineschutz/rag-project.git
@@ -36,89 +36,57 @@ ollama pull phi3
 ```bash
 source venv/bin/activate
 
-# Ask a question (RAG path)
+# Ask a question (defaults: dense RAG, Ollama, numpy store)
 python main.py --query "What is the difference between RAG-Sequence and RAG-Token?"
 
-# Skip retrieval — query the LLM directly with no context
+# Skip retrieval: query the LLM directly with no context
 python main.py --query "..." --no-rag
 
-# Use OpenAI instead of Ollama
+# OpenAI instead of Ollama (needs OPENAI_API_KEY)
 python main.py --query "..." --backend gpt
 
-# Use FAISS + SQLite backend (default: numpy)
-python main.py --query "..." --store faiss
+# Retrieval method: BM25 lexical (no embeddings), or hybrid (dense + BM25 fused)
+python main.py --query "..." --retriever bm25
+python main.py --query "..." --retriever hybrid --fusion weighted --alpha 0.7   # default fusion is rrf
 
-# Use approximate IVF index (better for large corpora)
+# Cross-encoder re-ranking, stacks on top of any retriever
+python main.py --query "..." --rerank
+
+# HyDE: draft a hypothetical answer first and embed that instead of the raw query
+python main.py --query "..." --hyde
+
+# Bigger context window (for high top_k / large chunks; phi3 supports up to 131072)
+python main.py --query "..." --num-ctx 8192
+
+# Dense store: numpy cosine (default), FAISS IndexFlatIP (exact, incremental updates),
+# or FAISS IndexIVFFlat (approximate, for large 10k+ corpora)
+python main.py --query "..." --store faiss
 python main.py --query "..." --store faiss --index-type ivf
 
-# BM25 (lexical) retrieval
-python main.py --query "..." --retriever bm25
-
-# Hybrid retrieval (dense + BM25, RRF fusion)
-python main.py --query "..." --retriever hybrid
-
-# Hybrid with weighted-sum fusion and custom alpha
-python main.py --query "..." --retriever hybrid --fusion weighted --alpha 0.7
-
-# Cross-encoder re-ranking on top of any retriever
-python main.py --query "..." --rerank
+# Swap the embedding model
+python main.py --query "..." --embed-model BAAI/bge-small-en-v1.5
 
 # See all options
 python main.py --help
 ```
 
-Place PDF, Markdown, or DOCX files in `./data/` to include them in the knowledge base.
+Drop PDF, Markdown, or DOCX files in `./data/` to add them to the knowledge base. Embeddings and chunk text are cached in `./cache/`. Delete it to force a full re-embed.
 
-## Storage backends
+## Results
 
-| Flag | Index | Storage | Best for |
-|------|-------|---------|---------|
-| `--store numpy` (default) | sklearn cosine similarity | `.npy` + `.json` | Baseline comparison, small corpora |
-| `--store faiss` | FAISS `IndexFlatIP` (exact) | `faiss.index` + SQLite | General use, supports incremental updates |
-| `--store faiss --index-type ivf` | FAISS `IndexIVFFlat` (approximate) | `faiss.index` + SQLite | Large corpora (10k+ chunks) |
+Benchmarked on 32 hand-written Q/A pairs (8 difficulty levels) over a corpus of real ML papers plus a few synthetic docs (`phi3`, local). Two qualitative sweep rounds, then a scored benchmark tracked in MLflow:
 
-Cache files are stored in `./cache/`. Delete them to force a full re-embed on the next run.
+- **`eval_results/` (round 1)** exposed a table-extraction bug: borderless / booktabs tables weren't parsed, so every table-lookup question failed. Fixed in ingestion and chunking.
+- **`eval_results2/` (round 2, 7 dimensions, post-fix)** showed the real ceiling is phi3's context window, not retrieval. At `top_k ≥ 40` or chunks ≥ 256 the prompt overflows the 4096 default and the model returns truncated gibberish.
 
-## Retrieval modes
+`scripts/benchmark.py` scores every answer two ways: an exact-match keyword check (`accuracy_29`) and an independent LLM-as-judge (`gpt-4o-mini`, not the model under test). Retrieval helps, and tuning helps more:
 
-| Flag | Method | Notes |
-|------|--------|-------|
-| (default) | Dense cosine | Uses `--store` backend above |
-| `--retriever bm25` | BM25 lexical | No embeddings needed |
-| `--retriever hybrid` | Dense + BM25 fused | `--fusion rrf\|weighted`, `--alpha` controls weight (default 0.5) |
-| `--rerank` | Cross-encoder re-score | Stacks on top of any retriever |
+| config | exact match | LLM judge |
+|--------|-------------|-----------|
+| no-RAG (phi3 alone) | 5/29 (17%) | 4/29 (14%) |
+| default RAG (dense, MiniLM, k=15) | 14/29 (48%) | 13/29 (45%) |
+| best (hybrid+RRF, rerank, bge-small, k=20) | 17/29 (59%) | 14/29 (48%) |
 
-## Experiment results
+The judge is stricter and narrows the gap (it catches keyword false positives), but agrees on the ranking. Cross-document synthesis and deep-table lookups stay unsolved by single-shot retrieval.
 
-Model: `phi3` via Ollama. ✓ = correct, ~ = partially correct, ✗ = wrong or hallucinated.
-
-Note: `rag_design_notes.md` and `qa_benchmark_report.docx` are synthetic documents created for this project.
-
-| Query | Ground truth | Source | Difficulty | No-RAG | Dense RAG | Best combo | Notes |
-|---|---|---|---|---|---|---|---|
-| `"How much did adding source attribution to the RAG prompt reduce hallucination?"` | From 23% to 6% | `rag_design_notes.md` | Flat Markdown file — no parsing challenge | ✗ | ✓ | — | RAG retrieves the unique stat cleanly |
-| `"What two pre-training tasks does BERT use?"` | MLM and NSP | `bert_devlin2018.pdf` | PDF prose — two-column reading order | ✓ | ✗ | ✓ `--retriever hybrid --rerank` | Dense drifted to GPT-paper chunks; BM25 locked on "BERT", reranker filtered noise |
-| `"What is the query latency of IndexFlatIP compared to IndexIVF?"` | FlatIP: 4 ms · IVF: 1 ms | `rag_design_notes.md` | Markdown table — exact numeric retrieval | ✗ | ~ | ✓ `--retriever bm25 --rerank` | Dense got direction right but wrong numbers; BM25 exact-matched the rare technical terms |
-| `"How many more attention heads does BERT-BASE have compared to the base Transformer model?"` | 12 − 8 = 4 | `bert_devlin2018.pdf` + `attention_is_all_you_need.pdf` | Cross-document synthesis — two papers | ✗ | ✗ | ✗ `--retriever hybrid --top-k 10 --rerank` | No single-shot retrieval strategy surfaces both facts together; requires multi-hop query decomposition |
-
-**Key findings:**
-- Single-document retrieval (Q1, Q2, Q3) is fully solvable with the right retriever combination
-- BM25 outperforms dense on queries with rare exact-match terminology
-- Cross-document synthesis (Q4) remains unsolved — a structural limitation of single-shot retrieval
-
----
-
-### HyDE comparison (`--hyde`)
-
-HyDE (Hypothetical Document Embeddings) asks the LLM to draft a hypothetical answer passage before retrieval, then embeds that passage instead of the raw query. This closes the vocabulary gap between layperson queries and technical document language.
-
-Model: `llama3.1` (8B). Query: *"What trick does the Transformer use so it doesn't have to read sentences left to right?"*
-
-| Path | Answer | Notes |
-|---|---|---|
-| No-RAG | ✓ | llama3.1 knows self-attention from training data |
-| Dense RAG | ~ | Retrieved BERT MLM chunks — right idea, wrong paper |
-| Dense RAG + HyDE | ~ | Retrieved cross-attention chunks — vague |
-| `--hyde --retriever hybrid --rerank` | ✗ | Still retrieves BERT MLM; query semantics map to bidirectionality regardless of retriever |
-
-The query's phrasing ("doesn't have to read left to right") maps to BERT's bidirectionality story in embedding space across all retriever strategies tried. No-RAG remains the best path for this query — llama3.1 answers correctly from training data without retrieval.
+Full per-question breakdown: [`eval_results2/summary.md`](eval_results2/summary.md). Reproduce: `python scripts/benchmark.py --config best --judge`, then `mlflow ui` to browse runs.
