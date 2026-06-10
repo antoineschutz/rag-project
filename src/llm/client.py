@@ -29,7 +29,7 @@ class LLMClient:
                 return response.choices[0].message.content or ""
             except Exception as e:
                 raise RuntimeError(
-                    f"OpenAI request failed — check that OPENAI_API_KEY is set correctly. ({e})"
+                    f"OpenAI request failed: check that OPENAI_API_KEY is set correctly. ({e})"
                 ) from e
 
         elif self.backend == "ollama":
@@ -43,7 +43,7 @@ class LLMClient:
                 return response.message.content or ""
             except Exception as e:
                 raise RuntimeError(
-                    f"Ollama request failed — is Ollama running with model '{self.model}' pulled? ({e})"
+                    f"Ollama request failed: is Ollama running with model '{self.model}' pulled? ({e})"
                 ) from e
 
         else:
