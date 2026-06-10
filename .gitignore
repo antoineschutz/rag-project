@@ -12,3 +12,5 @@ tools/
 docs/
 mlruns/
 mlflow.db
+eval_results*/.llm_cache.json
+eval_results*/*.log
