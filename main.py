@@ -30,12 +30,13 @@ def run_pipeline(
     hyde: bool = False,
     embedder: Embedder | None = None,
     chunk_max_tokens: int | None = None,
+    num_ctx: int | None = None,
 ) -> str:
     resolved_backend = backend or config.LLM_BACKEND
     resolved_top_k = top_k or config.TOP_K
     resolved_data_path = data_path or config.DATA_PATH
 
-    llm = LLMClient(backend=resolved_backend, model=model)
+    llm = LLMClient(backend=resolved_backend, model=model, num_ctx=num_ctx)
 
     if no_rag:
         return llm.generate(build_prompt_no_rag(query))

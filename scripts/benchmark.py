@@ -55,6 +55,19 @@ CONFIGS: dict[str, dict[str, Any]] = {
         "embed_model": "BAAI/bge-small-en-v1.5", "rerank": True, "top_k": 20,
         "chunk_max_tokens": 128,
     },
+    # best, but retrieve+rerank 40 chunks instead of 20. ~40×128 ≈ 5k context tokens,
+    # which overflows the default 4096 window, so this config carries num_ctx=8192.
+    "best-k40": {
+        "no_rag": False, "retriever": "hybrid", "fusion": "rrf", "alpha": 0.5,
+        "embed_model": "BAAI/bge-small-en-v1.5", "rerank": True, "top_k": 40,
+        "chunk_max_tokens": 128, "num_ctx": 8192,
+    },
+    # best-k40 with larger 256-token chunks. ~40×256 ≈ 10k context tokens → num_ctx=16384.
+    "best-k40-c256": {
+        "no_rag": False, "retriever": "hybrid", "fusion": "rrf", "alpha": 0.5,
+        "embed_model": "BAAI/bge-small-en-v1.5", "rerank": True, "top_k": 40,
+        "chunk_max_tokens": 256, "num_ctx": 16384,
+    },
 }
 
 
@@ -195,6 +208,8 @@ def _log_to_mlflow(report: dict[str, Any]) -> None:
         if report["judge"]:
             mlflow.log_param("judge_model", JUDGE_MODEL)
         mlflow.log_params(report["config"])
+        if "num_ctx" not in report["config"]:
+            mlflow.log_param("num_ctx", config.OLLAMA_NUM_CTX)
         metrics = {
             "accuracy_29": report["accuracy_29"],
             "correct": report["correct"],

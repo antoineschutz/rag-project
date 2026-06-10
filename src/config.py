@@ -10,6 +10,7 @@ class RAGConfig:
     TOP_K: int = 15
     LLM_BACKEND: str = "ollama"
     OLLAMA_MODEL: str = "phi3"
+    OLLAMA_NUM_CTX: int = 4096  # phi3 supports up to 131072; override per-run via OLLAMA_NUM_CTX env var
     OPENAI_MODEL: str = "gpt-4o-mini"
     CACHE_DIR: str = "./cache/"
     EMBEDDINGS_PATH: str = "./cache/embeddings.npy"

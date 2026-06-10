@@ -2,13 +2,15 @@ from src.config import config
 
 
 class LLMClient:
-    def __init__(self, backend: str = config.LLM_BACKEND, model: str | None = None) -> None:
-        """Set the LLM backend (ollama or gpt) and resolve the model name from config if not given."""
+    def __init__(self, backend: str = config.LLM_BACKEND, model: str | None = None,
+                 num_ctx: int | None = None) -> None:
+        """Set the backend (ollama or gpt), resolve the model name, and the Ollama context window."""
         self.backend = backend
         if model is None:
             self.model = config.OPENAI_MODEL if backend == "gpt" else config.OLLAMA_MODEL
         else:
             self.model = model
+        self.num_ctx = num_ctx if num_ctx is not None else config.OLLAMA_NUM_CTX
 
     def generate(self, prompt: str) -> str:
         """Send prompt to the configured LLM backend and return the response string."""
@@ -36,7 +38,7 @@ class LLMClient:
                 response = ollama.chat(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
-                    options={"temperature": 0},
+                    options={"temperature": 0, "num_ctx": self.num_ctx},
                 )
                 return response.message.content or ""
             except Exception as e:
