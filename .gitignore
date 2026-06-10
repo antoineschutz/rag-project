@@ -10,3 +10,5 @@ tmp/
 .ipynb_checkpoints/
 tools/
 docs/
+mlruns/
+mlflow.db
