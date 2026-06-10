@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quantitative benchmark — keyword-scored accuracy over the QA pairs.
+"""Quantitative benchmark: keyword-scored accuracy over the QA pairs.
 
 Shares the question set and pipeline runner with the qualitative tool
 (`scripts/eval.py`): it imports `QA_PAIRS` and the LLM-answer cache helpers from
@@ -46,6 +46,7 @@ JUDGE_MODEL = "gpt-4o-mini"
 # config dicts exactly so their cached answers are reused.
 # ---------------------------------------------------------------------------
 CONFIGS: dict[str, dict[str, Any]] = {
+    "no-rag": {"no_rag": True},
     "baseline": {
         "no_rag": False, "retriever": "dense",
         "embed_model": "all-MiniLM-L6-v2", "rerank": False, "top_k": 15,
@@ -97,7 +98,7 @@ def run_benchmark(
 
     Answers come from the shared LLM cache unless `fresh` is set, which regenerates
     every answer (and refreshes the cache). Latency is only measured for a fresh
-    run — a cached run's timing is meaningless — so `latency_s` is None otherwise.
+    run; a cached run's timing is meaningless, so `latency_s` is None otherwise.
 
     If `judge` is set, an independent API model (not the local LLM) also grades each
     answer against the reference; `score_judge` and the keyword/judge disagreement
@@ -176,7 +177,7 @@ def _print_report(report: dict[str, Any], verbose: bool = False) -> None:
             disagree = " ⚠" if judged != r["correct"] else ""
             head = f"kw {mark}  judge {'✓' if judged else '✗'}{disagree}  Q{r['id']:<2} (L{r['level']})"
         if verbose:
-            print(f"\n  {head} — keywords: {r['keywords']}")
+            print(f"\n  {head}  keywords: {r['keywords']}")
             print(f"      Q:        {r['question']}")
             print(f"      expected: {r['expected']}")
             print(f"      answer:   {r['answer']}")
@@ -188,7 +189,7 @@ def _print_report(report: dict[str, Any], verbose: bool = False) -> None:
     )
     summary += (
         f"   ({report['latency_s']:.0f}s)" if report["latency_s"] is not None
-        else "   (cached — latency not measured)"
+        else "   (cached, latency not measured)"
     )
     print(summary)
     if report.get("score_judge") is not None:
@@ -245,7 +246,7 @@ def main() -> None:
     _print_report(report, verbose=args.verbose)
     if not args.no_mlflow:
         _log_to_mlflow(report)
-        print(f"\nlogged to MLflow experiment '{EXPERIMENT_NAME}' — run `mlflow ui` to view")
+        print(f"\nlogged to MLflow experiment '{EXPERIMENT_NAME}' (run `mlflow ui` to view)")
 
 
 if __name__ == "__main__":

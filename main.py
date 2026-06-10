@@ -136,6 +136,13 @@ def main() -> None:
         action="store_true",
         help="Use HyDE: embed a hypothetical answer passage instead of the raw query",
     )
+    parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=None,
+        dest="num_ctx",
+        help="Ollama context window in tokens (default: config.OLLAMA_NUM_CTX = 4096)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
@@ -157,6 +164,7 @@ def main() -> None:
         alpha=args.alpha,
         rerank=args.rerank,
         hyde=args.hyde,
+        num_ctx=args.num_ctx,
     )
     print("\nANSWER:\n")
     print(answer)
