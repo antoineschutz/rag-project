@@ -81,17 +81,25 @@ def chunk_text_tiktoken(
     max_tokens: int = config.CHUNK_MAX_TOKENS,
     overlap_tokens: int = config.CHUNK_OVERLAP,
 ) -> list[str]:
-    overlap_tokens = min(overlap_tokens, max_tokens // 2)
     """Tiktoken-based chunker with overlap, treating markdown table blocks as atomic units.
 
-    Table blocks (lines starting with '|') are never split and are emitted as
-    a single chunk regardless of token length. Prose segments follow the normal
-    sentence-accumulation logic with overlap carry-over.
+    Tables are never split. If a table fits in the current chunk alongside
+    surrounding prose (title before, description after), it stays in the same
+    chunk. If not, the current chunk is flushed first and the table starts a
+    fresh one. Prose segments follow the normal sentence-accumulation logic
+    with overlap carry-over.
     """
+    overlap_tokens = min(overlap_tokens, max_tokens // 2)
     enc = tiktoken.get_encoding("cl100k_base")
 
     def token_len(s: str) -> int:
         return len(enc.encode(s))
+
+    def flush_chunk(parts: list[str]) -> str:
+        # Preserve newlines when the chunk contains a table block.
+        if any("\n" in p for p in parts):
+            return "\n\n".join(p.strip() for p in parts if p.strip())
+        return " ".join(parts)
 
     chunks: list[str] = []
     current_chunk: list[str] = []
@@ -103,7 +111,7 @@ def chunk_text_tiktoken(
 
         if sentence_tokens > max_tokens:
             if current_chunk:
-                chunks.append(" ".join(current_chunk))
+                chunks.append(flush_chunk(current_chunk))
                 current_chunk = []
                 current_tokens = 0
             tokens = enc.encode(sentence)
@@ -116,9 +124,9 @@ def chunk_text_tiktoken(
             return
 
         if current_tokens + sentence_tokens > max_tokens:
-            chunks.append(" ".join(current_chunk))
+            chunks.append(flush_chunk(current_chunk))
             if overlap_tokens > 0:
-                flat_tokens = enc.encode(" ".join(current_chunk))
+                flat_tokens = enc.encode(flush_chunk(current_chunk))
                 overlap = flat_tokens[-overlap_tokens:]
                 current_chunk = [enc.decode(overlap), sentence]
                 current_tokens = len(overlap) + sentence_tokens
@@ -129,13 +137,25 @@ def chunk_text_tiktoken(
             current_chunk.append(sentence)
             current_tokens += sentence_tokens
 
-    for seg_type, seg_text in _split_table_blocks(text):
-        if seg_type == "table":
+    def add_table(table_text: str) -> None:
+        nonlocal current_chunk, current_tokens
+        table_tokens = token_len(table_text)
+        if current_tokens + table_tokens > max_tokens:
             if current_chunk:
-                chunks.append(" ".join(current_chunk))
+                chunks.append(flush_chunk(current_chunk))
                 current_chunk = []
                 current_tokens = 0
-            chunks.append(seg_text)
+        current_chunk.append(table_text)
+        current_tokens += table_tokens
+        # Flush immediately if the table alone already fills the budget.
+        if current_tokens >= max_tokens:
+            chunks.append(flush_chunk(current_chunk))
+            current_chunk = []
+            current_tokens = 0
+
+    for seg_type, seg_text in _split_table_blocks(text):
+        if seg_type == "table":
+            add_table(seg_text)
         else:
             for sentence in sent_tokenize(seg_text):
                 sentence = sentence.strip()
@@ -143,7 +163,7 @@ def chunk_text_tiktoken(
                     add_sentence(sentence)
 
     if current_chunk:
-        chunks.append(" ".join(current_chunk))
+        chunks.append(flush_chunk(current_chunk))
     return chunks
 
 
