@@ -84,6 +84,28 @@ def test_evaluate_inline_config_uses_custom_label(monkeypatch):
     assert captured["cfg"] == {"retriever": "bm25"}
 
 
+def test_evaluate_known_preset_wins_over_inline_config(monkeypatch):
+    # Regression: a known preset `name` must win and the inline `config` be ignored, so the
+    # Swagger placeholder config cannot silently shadow the preset (and collide cache keys).
+    captured: dict[str, Any] = {}
+
+    def fake_run_benchmark(label: str, cfg: Any, fresh: bool = False, judge: bool = False) -> dict[str, Any]:
+        captured.update(label=label, cfg=cfg)
+        return _fake_report(label)
+
+    monkeypatch.setattr(benchmark_mod, "run_benchmark", fake_run_benchmark)
+
+    client = TestClient(server.app)
+    resp = client.post(
+        "/evaluate",
+        json={"name": "best", "config": {"additionalProp1": {}}},
+    )
+
+    assert resp.status_code == 200
+    assert captured["label"] == "best"
+    assert captured["cfg"] is server.PRESETS["best"]
+
+
 def test_evaluate_unknown_preset_returns_400():
     client = TestClient(server.app)
     resp = client.post("/evaluate", json={"name": "does-not-exist"})
