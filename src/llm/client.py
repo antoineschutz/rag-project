@@ -1,16 +1,16 @@
-from src.config import config
+from src.config import env
 
 
 class LLMClient:
-    def __init__(self, backend: str = config.LLM_BACKEND, model: str | None = None,
+    def __init__(self, backend: str = env.LLM_BACKEND, model: str | None = None,
                  num_ctx: int | None = None) -> None:
         """Set the backend (ollama or gpt), resolve the model name, and the Ollama context window."""
         self.backend = backend
         if model is None:
-            self.model = config.OPENAI_MODEL if backend == "gpt" else config.OLLAMA_MODEL
+            self.model = env.OPENAI_MODEL if backend == "gpt" else env.OLLAMA_MODEL
         else:
             self.model = model
-        self.num_ctx = num_ctx if num_ctx is not None else config.OLLAMA_NUM_CTX
+        self.num_ctx = num_ctx if num_ctx is not None else env.OLLAMA_NUM_CTX
 
     def generate(self, prompt: str) -> str:
         """Send prompt to the configured LLM backend and return the response string."""

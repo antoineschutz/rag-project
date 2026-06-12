@@ -19,9 +19,22 @@ EMBEDDINGS = np.eye(len(DOCS), DIM, dtype=np.float32)
 QUERY_EMBEDDING = EMBEDDINGS[2:3]
 
 
+class _StubEmbedder:
+    """Maps any query string to QUERY_EMBEDDING, so the dense arm always matches c.txt.
+
+    Lets the hybrid tests keep their synthetic geometry without loading a real model now
+    that retrievers embed the query string internally.
+    """
+
+    model_name = "stub"
+
+    def embed_query(self, query: str) -> np.ndarray:
+        return QUERY_EMBEDDING
+
+
 @pytest.fixture
 def dense() -> RetrieverCosine:
-    return RetrieverCosine(DOCS, EMBEDDINGS)
+    return RetrieverCosine(DOCS, EMBEDDINGS, embedder=_StubEmbedder())
 
 
 @pytest.fixture
@@ -40,29 +53,29 @@ def hybrid_weighted(dense: RetrieverCosine, bm25: RetrieverBM25) -> RetrieverHyb
 
 
 def test_rrf_ranking(hybrid_rrf: RetrieverHybrid) -> None:
-    results = hybrid_rrf.retrieve("neural network gradient descent", QUERY_EMBEDDING, top_k=5)
+    results = hybrid_rrf.retrieve("neural network gradient descent", top_k=5)
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True)
 
 
 def test_weighted_ranking(hybrid_weighted: RetrieverHybrid) -> None:
-    results = hybrid_weighted.retrieve("neural network gradient descent", QUERY_EMBEDDING, top_k=5)
+    results = hybrid_weighted.retrieve("neural network gradient descent", top_k=5)
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True)
 
 
 def test_rrf_top_k(hybrid_rrf: RetrieverHybrid) -> None:
     for k in (1, 3, 5):
-        assert len(hybrid_rrf.retrieve("cat", QUERY_EMBEDDING, top_k=k)) == k
+        assert len(hybrid_rrf.retrieve("cat", top_k=k)) == k
 
 
 def test_weighted_top_k(hybrid_weighted: RetrieverHybrid) -> None:
     for k in (1, 3, 5):
-        assert len(hybrid_weighted.retrieve("cat", QUERY_EMBEDDING, top_k=k)) == k
+        assert len(hybrid_weighted.retrieve("cat", top_k=k)) == k
 
 
 def test_rrf_result_keys(hybrid_rrf: RetrieverHybrid) -> None:
-    results = hybrid_rrf.retrieve("cat", QUERY_EMBEDDING, top_k=1)
+    results = hybrid_rrf.retrieve("cat", top_k=1)
     assert set(results[0].keys()) == {"text", "source", "score"}
 
 
@@ -70,5 +83,5 @@ def test_rrf_boosts_overlap(dense: RetrieverCosine, bm25: RetrieverBM25) -> None
     # c.txt ranks #1 in dense (QUERY_EMBEDDING matches it exactly) and top-2 in BM25
     # for the query "neural network gradient descent" — it should win the fused ranking
     retriever = RetrieverHybrid(dense, bm25, fusion="rrf")
-    results = retriever.retrieve("neural network gradient descent", QUERY_EMBEDDING, top_k=5)
+    results = retriever.retrieve("neural network gradient descent", top_k=5)
     assert results[0]["source"] == "c.txt"

@@ -347,7 +347,7 @@ def load_pdfs_pypdf(folder_path: str) -> list[dict[str, str]]:
             full_text = " ".join(pages_text).strip()
             documents.append({"text": full_text, "source": path.name})
         except Exception as e:
-            logger.warning("Skipping %s — %s", path.name, e)
+            logger.warning("Skipping %s: %s", path.name, e)
     return documents
 
 
@@ -365,7 +365,7 @@ def load_pdfs(folder_path: str) -> list[dict[str, str]]:
             full_text = "\n\n".join(pages_text).strip()
             documents.append({"text": full_text, "source": path.name})
         except Exception as e:
-            logger.warning("Skipping %s — %s", path.name, e)
+            logger.warning("Skipping %s: %s", path.name, e)
     return documents
 
 
@@ -378,7 +378,20 @@ def load_markdown(folder_path: str) -> list[dict[str, str]]:
             if text:
                 documents.append({"text": text, "source": path.name})
         except Exception as e:
-            logger.warning("Skipping %s — %s", path.name, e)
+            logger.warning("Skipping %s: %s", path.name, e)
+    return documents
+
+
+def load_txt(folder_path: str) -> list[dict[str, str]]:
+    """Load all .txt files in folder_path as plain text documents."""
+    documents = []
+    for path in Path(folder_path).glob("*.txt"):
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+            if text:
+                documents.append({"text": text, "source": path.name})
+        except Exception as e:
+            logger.warning("Skipping %s: %s", path.name, e)
     return documents
 
 
@@ -397,5 +410,10 @@ def load_docx(folder_path: str) -> list[dict[str, str]]:
 
 
 def load_documents(folder_path: str) -> list[dict[str, str]]:
-    """Load all supported documents (PDF, Markdown, DOCX) from folder_path."""
-    return load_pdfs(folder_path) + load_markdown(folder_path) + load_docx(folder_path)
+    """Load all supported documents (PDF, Markdown, text, DOCX) from folder_path."""
+    return (
+        load_pdfs(folder_path)
+        + load_markdown(folder_path)
+        + load_txt(folder_path)
+        + load_docx(folder_path)
+    )

@@ -17,7 +17,11 @@ DOCS = [
 
 # embeddings: doc 2 is most similar to the query
 EMBEDDINGS = np.eye(len(DOCS), DIM, dtype="float32")
-QUERY = EMBEDDINGS[2:3]  # shape (1, DIM) — identical to doc 2
+QUERY = EMBEDDINGS[2:3]  # shape (1, DIM), identical to doc 2
+
+# These tests exercise the vector-level seam (_retrieve_vec) directly with synthetic
+# embeddings, so no embedder/model load is needed. The public retrieve(query: str) path
+# (embed then _retrieve_vec) is covered end-to-end by the pipeline.
 
 
 @pytest.fixture
@@ -31,18 +35,18 @@ def faiss_retriever():
 
 
 def test_retrieve_ranking(retriever):
-    results = retriever.retrieve(QUERY, top_k=5)
+    results = retriever._retrieve_vec(QUERY, top_k=5)
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True)
 
 
 def test_retrieve_top_k(retriever):
-    results = retriever.retrieve(QUERY, top_k=3)
+    results = retriever._retrieve_vec(QUERY, top_k=3)
     assert len(results) == 3
 
 
 def test_retrieve_score_keys(retriever):
-    results = retriever.retrieve(QUERY, top_k=2)
+    results = retriever._retrieve_vec(QUERY, top_k=2)
     for r in results:
         assert "text" in r
         assert "source" in r
@@ -50,21 +54,21 @@ def test_retrieve_score_keys(retriever):
 
 
 def test_retrieve_best_match(retriever):
-    results = retriever.retrieve(QUERY, top_k=1)
+    results = retriever._retrieve_vec(QUERY, top_k=1)
     assert results[0]["text"] == "about birds"
 
 
 def test_faiss_retrieve_ranking(faiss_retriever):
-    results = faiss_retriever.retrieve(QUERY[0], top_k=5)
+    results = faiss_retriever._retrieve_vec(QUERY[0], top_k=5)
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True)
 
 
 def test_faiss_retrieve_top_k(faiss_retriever):
-    results = faiss_retriever.retrieve(QUERY[0], top_k=3)
+    results = faiss_retriever._retrieve_vec(QUERY[0], top_k=3)
     assert len(results) == 3
 
 
 def test_faiss_retrieve_best_match(faiss_retriever):
-    results = faiss_retriever.retrieve(QUERY[0], top_k=1)
+    results = faiss_retriever._retrieve_vec(QUERY[0], top_k=1)
     assert results[0]["text"] == "about birds"

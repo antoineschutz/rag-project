@@ -23,6 +23,16 @@ Answer:
 """
 
 
+def build_prompt_judge(question: str, expected: str, answer: str) -> str:
+    return f"""You are grading a short factual answer against a reference answer.
+
+Question: {question}
+Reference answer: {expected}
+Candidate answer: {answer}
+
+Does the candidate state the key fact(s) of the reference answer correctly? Ignore style, extra detail, and hedging. Reply with a single word: YES or NO."""
+
+
 def build_prompt_rag(query: str, contexts: list[str]) -> str:
     context_text = "\n\n".join(contexts)
     return f"""Answer the following question using only the context below.

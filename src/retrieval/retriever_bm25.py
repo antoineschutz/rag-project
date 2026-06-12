@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from rank_bm25 import BM25Okapi
 
-from src.config import config
+from src.config import BASE
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
 
@@ -21,7 +21,7 @@ class RetrieverBM25:
         self.bm25 = BM25Okapi(tokenized)
         logger.info("BM25 index built over %d chunks.", len(chunked_docs))
 
-    def retrieve(self, query: str, top_k: int = config.TOP_K) -> list[dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
         """Return top_k chunks ranked by BM25 score for the given query string."""
         tokens = query.lower().split()
         scores = self.bm25.get_scores(tokens)

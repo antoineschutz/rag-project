@@ -1,6 +1,6 @@
 import pytest
 
-from src.ingestion.loader import load_docx, load_markdown, load_pdfs
+from src.ingestion.loader import load_docx, load_markdown, load_pdfs, load_txt
 from src.chunking.chunk import chunk_documents
 
 
@@ -21,6 +21,14 @@ def md_chunks() -> list[dict[str, str]]:
 @pytest.fixture(scope="session")
 def docx_chunks() -> list[dict[str, str]]:
     return chunk_documents(load_docx("data"))
+
+
+def test_load_txt(tmp_path):
+    (tmp_path / "note.txt").write_text("plain text body", encoding="utf-8")
+    (tmp_path / "blank.txt").write_text("   ", encoding="utf-8")  # whitespace-only is skipped
+    (tmp_path / "ignore.md").write_text("not a txt file", encoding="utf-8")
+    docs = load_txt(str(tmp_path))
+    assert docs == [{"text": "plain text body", "source": "note.txt"}]
 
 
 def test_md_prose_chunk(md_chunks):

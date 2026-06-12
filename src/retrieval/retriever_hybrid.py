@@ -1,9 +1,7 @@
 import logging
 from typing import Any
 
-import numpy as np
-
-from src.config import config
+from src.config import BASE
 from src.embeddings.embed import Embedder
 from src.retrieval.retriever_cosine import RetrieverCosine, build_cosine_retriever
 from src.retrieval.retriever_bm25 import RetrieverBM25, build_bm25_retriever
@@ -33,16 +31,25 @@ class RetrieverHybrid:
     def retrieve(
         self,
         query: str,
-        query_embedding: np.ndarray,
-        top_k: int = config.TOP_K,
+        top_k: int = BASE.top_k,
+        *,
+        fusion: str | None = None,
+        alpha: float | None = None,
     ) -> list[dict[str, Any]]:
-        """Return top_k chunks by fusing dense and BM25 candidate pools."""
+        """Return top_k chunks by fusing dense and BM25 candidate pools.
+
+        The same query string feeds both arms: the dense sub-retriever embeds it, BM25
+        tokenizes it. fusion/alpha override the instance defaults for this call (they are
+        per-query knobs, not baked into the index).
+        """
+        fusion = fusion if fusion is not None else self.fusion
+        alpha = alpha if alpha is not None else self.alpha
         pool = top_k * 3
-        dense_results = self.dense.retrieve(query_embedding, top_k=pool)
+        dense_results = self.dense.retrieve(query, top_k=pool)
         bm25_results = self.bm25.retrieve(query, top_k=pool)
-        if self.fusion == "rrf":
+        if fusion == "rrf":
             return self._fuse_rrf(dense_results, bm25_results, top_k)
-        return self._fuse_weighted(dense_results, bm25_results, top_k)
+        return self._fuse_weighted(dense_results, bm25_results, top_k, alpha)
 
     def _fuse_rrf(
         self,
@@ -76,6 +83,7 @@ class RetrieverHybrid:
         dense_results: list[dict[str, Any]],
         bm25_results: list[dict[str, Any]],
         top_k: int,
+        alpha: float,
     ) -> list[dict[str, Any]]:
         """Weighted sum fusion with per-query min-max normalisation."""
         def _minmax(results: list[dict[str, Any]]) -> dict[str, float]:
@@ -97,8 +105,8 @@ class RetrieverHybrid:
         fused = []
         for text, meta in seen.items():
             score = (
-                self.alpha * dense_norm.get(text, 0.0)
-                + (1 - self.alpha) * bm25_norm.get(text, 0.0)
+                alpha * dense_norm.get(text, 0.0)
+                + (1 - alpha) * bm25_norm.get(text, 0.0)
             )
             fused.append({**meta, "score": score})
 

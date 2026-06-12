@@ -6,7 +6,7 @@ A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no L
 
 Data flows linearly through five stages:
 
-1. **Ingestion**: layout-aware extraction with `pdfplumber` (multi-column reading order; tables, including borderless/booktabs tables, rendered as Markdown), plus Markdown and DOCX, from `./data/`
+1. **Ingestion**: layout-aware extraction with `pdfplumber` (multi-column reading order; tables, including borderless/booktabs tables, rendered as Markdown), plus Markdown, text, and DOCX, from `./data/`
 2. **Chunking**: sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens / 50-token overlap. Tables are kept atomic (never split mid-row) and bundled with surrounding prose when they fit
 3. **Embedding**: `sentence-transformers`, model swappable via `--embed-model` (`all-MiniLM-L6-v2` default; `bge-*`, `e5-*` supported)
 4. **Retrieval**: dense cosine (numpy or FAISS), BM25 lexical, or hybrid fusion. Optional cross-encoder re-ranking and HyDE query expansion on top
@@ -70,7 +70,26 @@ python main.py --query "..." --embed-model BAAI/bge-small-en-v1.5
 python main.py --help
 ```
 
-Drop PDF, Markdown, or DOCX files in `./data/` to add them to the knowledge base. Embeddings and chunk text are cached in `./cache/`. Delete it to force a full re-embed.
+Drop PDF, Markdown, text, or DOCX files in `./data/` to add them to the knowledge base. Embeddings and chunk text are cached in `./cache/`. Delete it to force a full re-embed.
+
+## API server
+
+A FastAPI server (`src/api/server.py`) exposes the same pipeline over HTTP:
+
+```bash
+uvicorn src.api.server:app --reload
+```
+
+Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup the server warms the presets it will serve (loads the embedder, index, and reranker) so the first request is not cold.
+
+| endpoint | purpose |
+|----------|---------|
+| `GET /health` | liveness check |
+| `GET /presets` | list the named presets (`baseline`, `best`, `no-rag`) and their configs |
+| `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides, or omit `config` for the best preset |
+| `POST /upload` | add a PDF/Markdown/text/DOCX file to the corpus; invalidates the cache so the index rebuilds on the next query |
+| `POST /evaluate` | score a config over the keyword-graded QA set (`accuracy_29`, optional LLM judge). A known preset `name` wins; pass an inline `config` under a non-preset name to score a custom config |
+| `POST /compare` | run one query through two configs and return both answers and chunks side by side |
 
 ## Results
 

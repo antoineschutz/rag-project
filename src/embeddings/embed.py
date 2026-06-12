@@ -1,11 +1,11 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from src.config import config
+from src.config import BASE
 
 
 class Embedder:
-    def __init__(self, model_name: str = config.EMBED_MODEL) -> None:
+    def __init__(self, model_name: str = BASE.embed_model) -> None:
         """Load the sentence-transformer embedding model."""
         self.model_name = model_name
         self.model = SentenceTransformer(model_name)
@@ -17,7 +17,7 @@ class Embedder:
         except MemoryError:
             raise MemoryError(
                 f"Out of memory while embedding {len(texts)} documents. "
-                "Try reducing CHUNK_MAX_TOKENS in src/config.py."
+                "Try reducing chunk_max_tokens in PipelineConfig (src/config/pipeline.py)."
             )
 
     def embed_query(self, query: str) -> np.ndarray:

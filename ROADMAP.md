@@ -73,7 +73,7 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 **Why:** S exposes the pipeline as a REST API; U wraps it in a browser UI. U depends on S, since the dashboard calls the API rather than the pipeline directly.
 
-- [ ] **S. FastAPI server.** Four endpoints: `POST /upload` (ingest a document), `POST /query` (run the pipeline, return JSON), `POST /evaluate` (run a fixed question set, return metrics), `POST /compare` (same query across two configs, both results). *(Medium: REST APIs, async Python)*
+- [x] **S. FastAPI server.** Endpoints: `POST /upload` (ingest a document), `POST /query` (run the pipeline, return JSON), `POST /evaluate` (run a fixed question set, return metrics), `POST /compare` (same query across two configs, both results), plus `GET /health` and `GET /presets`. *(Medium: REST APIs, async Python)*
 - [ ] **U. Streamlit dashboard.** Browser UI to run queries live, show retrieved chunks, compare RAG vs no-RAG side-by-side, and chart evaluation metrics (latency, retrieval scores). *(Medium: Streamlit, frontend ML tools)*
 
 ---

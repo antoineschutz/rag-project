@@ -1,82 +1,9 @@
 import argparse
 import logging
 
-from src.config import config
-from src.embeddings.embed import Embedder
-from src.retrieval.retriever_cosine import build_cosine_retriever
-from src.retrieval.retriever_faiss import build_faiss_retriever
-from src.retrieval.retriever_bm25 import build_bm25_retriever
-from src.retrieval.retriever_hybrid import build_hybrid_retriever
-from src.prompts.templates import build_prompt_rag, build_prompt_no_rag
-from src.llm.client import LLMClient
-
-logger = logging.getLogger(__name__)
-
-
-def run_pipeline(
-    query: str,
-    data_path: str | None = None,
-    backend: str | None = None,
-    model: str | None = None,
-    embed_model: str | None = None,
-    top_k: int | None = None,
-    no_rag: bool = False,
-    store: str = "numpy",
-    index_type: str = "flat",
-    retriever: str = "dense",
-    fusion: str = "rrf",
-    alpha: float = 0.5,
-    rerank: bool = False,
-    hyde: bool = False,
-    embedder: Embedder | None = None,
-    chunk_max_tokens: int | None = None,
-    num_ctx: int | None = None,
-) -> str:
-    resolved_backend = backend or config.LLM_BACKEND
-    resolved_top_k = top_k or config.TOP_K
-    resolved_data_path = data_path or config.DATA_PATH
-
-    llm = LLMClient(backend=resolved_backend, model=model, num_ctx=num_ctx)
-
-    if no_rag:
-        return llm.generate(build_prompt_no_rag(query))
-
-    retrieval_k = resolved_top_k * 3 if rerank else resolved_top_k
-
-    if retriever == "bm25":
-        ret = build_bm25_retriever(resolved_data_path, chunk_max_tokens=chunk_max_tokens)
-        results = ret.retrieve(query, top_k=retrieval_k)
-    else:
-        if embedder is None:
-            embedder = Embedder(model_name=embed_model or config.EMBED_MODEL)
-
-        if hyde:
-            from src.hyde.hyde import generate_hypothetical_doc
-            embed_input = generate_hypothetical_doc(query, llm)
-        else:
-            embed_input = query
-
-        query_embedding = embedder.embed_query(embed_input)
-
-        if retriever == "hybrid":
-            ret = build_hybrid_retriever(
-                resolved_data_path, embedder, store, index_type,
-                fusion=fusion, alpha=alpha, chunk_max_tokens=chunk_max_tokens,
-            )
-            results = ret.retrieve(query, query_embedding, top_k=retrieval_k)
-        else:
-            if store == "faiss":
-                ret = build_faiss_retriever(resolved_data_path, embedder, index_type=index_type, chunk_max_tokens=chunk_max_tokens)
-            else:
-                ret = build_cosine_retriever(resolved_data_path, embedder, chunk_max_tokens=chunk_max_tokens)
-            results = ret.retrieve(query_embedding, top_k=retrieval_k)
-
-    if rerank:
-        from src.reranker.reranker import Reranker
-        results = Reranker().rerank(query, results, top_k=resolved_top_k)
-
-    contexts = [r["text"] for r in results]
-    return llm.generate(build_prompt_rag(query, contexts))
+from src.config import split_config
+from src.pipeline import answer_query
+from src.retrieval.factory import build_index
 
 
 def main() -> None:
@@ -141,7 +68,7 @@ def main() -> None:
         type=int,
         default=None,
         dest="num_ctx",
-        help="Ollama context window in tokens (default: config.OLLAMA_NUM_CTX = 4096)",
+        help="Ollama context window in tokens (default: env.OLLAMA_NUM_CTX = 4096)",
     )
     args = parser.parse_args()
 
@@ -149,25 +76,14 @@ def main() -> None:
     for name in ("__main__", "src"):
         logging.getLogger(name).setLevel(args.log_level)
 
-    answer = run_pipeline(
-        query=args.query,
-        data_path=args.data_path,
-        backend=args.backend,
-        model=args.model,
-        embed_model=args.embed_model,
-        top_k=args.top_k,
-        no_rag=args.no_rag,
-        store=args.store,
-        index_type=args.index_type,
-        retriever=args.retriever,
-        fusion=args.fusion,
-        alpha=args.alpha,
-        rerank=args.rerank,
-        hyde=args.hyde,
-        num_ctx=args.num_ctx,
-    )
+    # Map the parsed args onto the three param groups (unknown keys like log_level are ignored).
+    index_params, retrieval_params, generation_params = split_config(vars(args), args.query)
+
+    retriever = None if generation_params.no_rag else build_index(index_params)
+    result = answer_query(retriever, retrieval_params, generation_params)
+
     print("\nANSWER:\n")
-    print(answer)
+    print(result["answer"])
 
 
 if __name__ == "__main__":

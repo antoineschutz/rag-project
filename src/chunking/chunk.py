@@ -4,7 +4,7 @@ import nltk
 import tiktoken
 from nltk.tokenize import sent_tokenize
 
-from src.config import config
+from src.config import BASE
 
 nltk.download("punkt", quiet=True)
 nltk.download("punkt_tab", quiet=True)
@@ -78,8 +78,8 @@ def chunk_text(text: str, chunk_size: int = 500, min_chunk_size: int = 300) -> l
 
 def chunk_text_tiktoken(
     text: str,
-    max_tokens: int = config.CHUNK_MAX_TOKENS,
-    overlap_tokens: int = config.CHUNK_OVERLAP,
+    max_tokens: int = BASE.chunk_max_tokens,
+    overlap_tokens: int = BASE.chunk_overlap,
 ) -> list[str]:
     """Tiktoken-based chunker with overlap, treating markdown table blocks as atomic units.
 

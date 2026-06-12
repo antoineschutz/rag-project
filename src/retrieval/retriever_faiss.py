@@ -1,16 +1,15 @@
 import logging
-import os
 from typing import Any
 
 import faiss
 import numpy as np
 
-from src.config import config
+from src.config import BASE
 from src.embeddings.embed import Embedder
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
 from src.store.sqlite_store import ChunkStore
-from src.retrieval.cache_utils import cache_matches, clear_cache, write_cache_model
+from src.utils.cache import cache_paths
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +20,15 @@ class RetrieverFAISS:
         chunked_docs: list[dict[str, str]],
         doc_embeddings: np.ndarray,
         index_type: str = "flat",
+        embedder: Embedder | None = None,
     ) -> None:
-        """Build a FAISS index (flat or IVF) from chunk embeddings and store the docs."""
+        """Build a FAISS index (flat or IVF) from chunk embeddings and store the docs.
+
+        The embedder embeds the query string at retrieve time; optional so callers with
+        raw query vectors (e.g. tests) can use _retrieve_vec.
+        """
         self.docs = chunked_docs
+        self.embedder = embedder
         vectors = doc_embeddings.astype("float32")
         faiss.normalize_L2(vectors)
         dim = vectors.shape[1]
@@ -40,14 +45,26 @@ class RetrieverFAISS:
         self.index.add(vectors)
 
     @classmethod
-    def from_index(cls, chunked_docs: list[dict[str, str]], index: faiss.Index) -> "RetrieverFAISS":
+    def from_index(
+        cls,
+        chunked_docs: list[dict[str, str]],
+        index: faiss.Index,
+        embedder: Embedder | None = None,
+    ) -> "RetrieverFAISS":
         """Construct a RetrieverFAISS from an already-loaded FAISS index, bypassing __init__."""
         obj = cls.__new__(cls)
         obj.docs = chunked_docs
         obj.index = index
+        obj.embedder = embedder
         return obj
 
-    def retrieve(self, query_embedding: np.ndarray, top_k: int = config.TOP_K) -> list[dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
+        """Embed the query string and return the top_k most similar chunks."""
+        if self.embedder is None:
+            raise ValueError("RetrieverFAISS.retrieve needs an embedder; pass one to build, or call _retrieve_vec with a vector.")
+        return self._retrieve_vec(self.embedder.embed_query(query), top_k=top_k)
+
+    def _retrieve_vec(self, query_embedding: np.ndarray, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
         """Return the top_k chunks most similar to query_embedding using the FAISS index."""
         query = np.array(query_embedding, dtype="float32")
         if query.ndim == 1:
@@ -76,24 +93,19 @@ def build_faiss_retriever(
     chunk_max_tokens: int | None = None,
 ) -> RetrieverFAISS:
     """Build a FAISS retriever, loading index and chunks from cache if available."""
-    effective_chunk_size = chunk_max_tokens or config.CHUNK_MAX_TOKENS
-    stamp = f"{embedder.model_name}:{effective_chunk_size}"
-    os.makedirs(config.CACHE_DIR, exist_ok=True)
-    if not cache_matches(stamp):
-        logger.info("Cache stamp changed — clearing cache.")
-        clear_cache()
-    chunk_store = ChunkStore(config.SQLITE_DB_PATH)
-    if os.path.exists(config.FAISS_INDEX_PATH) and chunk_store.exists():
+    effective_chunk_size = chunk_max_tokens or BASE.chunk_max_tokens
+    paths = cache_paths(embedder.model_name, effective_chunk_size)
+    chunk_store = ChunkStore(str(paths.sqlite_db))
+    if paths.faiss_index.exists() and chunk_store.exists():
         logger.info("Loading from FAISS + SQLite cache...")
         chunked_docs = chunk_store.load()
-        index = faiss.read_index(config.FAISS_INDEX_PATH)
-        return RetrieverFAISS.from_index(chunked_docs, index)
+        index = faiss.read_index(str(paths.faiss_index))
+        return RetrieverFAISS.from_index(chunked_docs, index, embedder=embedder)
     docs = load_documents(data_path)
     chunked_docs = chunk_documents(docs, chunk_max_tokens=effective_chunk_size)
     doc_embeddings = embedder.embed_documents([d["text"] for d in chunked_docs])
     chunk_store.save(chunked_docs)
-    retriever = RetrieverFAISS(chunked_docs, doc_embeddings, index_type=index_type)
-    faiss.write_index(retriever.index, config.FAISS_INDEX_PATH)
-    write_cache_model(stamp)
+    retriever = RetrieverFAISS(chunked_docs, doc_embeddings, index_type=index_type, embedder=embedder)
+    faiss.write_index(retriever.index, str(paths.faiss_index))
     logger.info("Embeddings saved to FAISS + SQLite cache.")
     return retriever
