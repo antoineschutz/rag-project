@@ -89,13 +89,13 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 ---
 
-## V8: Infrastructure upgrade
+## V8: Vector database backend
 
-**Theme:** replace the dual FAISS + SQLite store with a proper vector database.
+**Theme:** add Qdrant as a third dense backend alongside numpy and FAISS.
 
-**Why:** Qdrant handles vectors, metadata, and CRUD in one service, removing the dual-store sync problem. Metadata filtering then becomes first-class. Q requires J.
+**Why:** Qdrant handles vectors, metadata, and CRUD in one service. Adding it as a selectable dense store (`numpy` / `faiss` / `qdrant`) makes metadata filtering first-class while leaving the existing backends in place as options. Q requires J.
 
-- [ ] **J. Qdrant vector database.** Store each chunk as a point `{id, vector, payload}` (payload holds text and source); removes the dual-store sync problem. *(Medium: vector databases, Qdrant)*
+- [ ] **J. Qdrant vector database.** Add a `store=qdrant` dense backend selectable via config: store each chunk as a point `{id, vector, payload}` with text and source in the payload. Dense-only at first; numpy and FAISS stay as alternatives. *(Medium: vector databases, Qdrant)*
 - [ ] **Q. Metadata filtering.** Let `retriever.retrieve()` filter by source before ranking; trivial with Qdrant payload filters, awkward without one. *(Low: metadata, search filters)*
 
 ---
@@ -104,8 +104,6 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 **Theme:** production hardening and deployment.
 
-**Why:** V expands data sources beyond local files; AA handles concurrent workloads; W is intentionally last, packaging the complete project once everything else is settled.
+**Why:** W is intentionally last, packaging the complete project once everything else is settled so anyone can run it with a single command.
 
-- [ ] **V. Web ingestion.** A `requests` + `BeautifulSoup` scraper as a third data source. *(Medium: web scraping)*
 - [ ] **W. Docker.** `Dockerfile` + `docker-compose.yml` bundling the app and Ollama. *(Medium: containers)*
-- [ ] **AA. Async pipeline.** `asyncio`-based ingestion and embedding for parallel processing. *(High: async Python)*
