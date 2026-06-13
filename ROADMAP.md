@@ -74,7 +74,7 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 **Why:** S exposes the pipeline as a REST API; U wraps it in a browser UI. U depends on S, since the dashboard calls the API rather than the pipeline directly.
 
 - [x] **S. FastAPI server.** Endpoints: `POST /query` (run the pipeline, return JSON), `POST /evaluate` (run a fixed question set, return metrics), `POST /compare` (same query across two configs, both results), plus `GET /health` and `GET /presets`. *(Medium: REST APIs, async Python)*
-- [ ] **U. Streamlit dashboard.** Browser UI to run queries live, show retrieved chunks, compare RAG vs no-RAG side-by-side, and chart evaluation metrics (latency, retrieval scores). *(Medium: Streamlit, frontend ML tools)*
+- [x] **U. Streamlit dashboard.** Browser UI (`dashboard/`) over the API: run queries live and show retrieved chunks, compare two configs (RAG vs no-RAG) side-by-side, and chart evaluation metrics from MLflow plus an optional live run. *(Medium: Streamlit, frontend ML tools)*
 
 ---
 

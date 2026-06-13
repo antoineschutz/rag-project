@@ -29,13 +29,14 @@ def answer_query(
 
     When `gp.no_rag` is set, retrieval is skipped and `retriever` may be None. Otherwise a
     retriever is required (a None retriever with no_rag=False is a caller bug and raises).
-    Returns {"answer": str, "chunks": list[{"text", "source", "score"}]} (empty chunks for
-    the no-RAG path). `reranker` is injected for reuse; built lazily when None.
+    Returns {"answer": str, "chunks": list[{"text", "source", "score"}], "hyde_doc": str | None}
+    (empty chunks and hyde_doc=None for the no-RAG path; hyde_doc holds the generated passage when
+    HyDE ran). `reranker` is injected for reuse; built lazily when None.
     """
     llm = LLMClient(backend=gp.backend or env.LLM_BACKEND, model=gp.model, num_ctx=gp.num_ctx)
 
     if gp.no_rag:
-        return {"answer": llm.generate(build_prompt_no_rag(rp.query)), "chunks": []}
+        return {"answer": llm.generate(build_prompt_no_rag(rp.query)), "chunks": [], "hyde_doc": None}
 
     if retriever is None:
         raise ValueError(
@@ -50,8 +51,10 @@ def answer_query(
     if rp.hyde:
         from src.hyde.hyde import generate_hypothetical_doc
         retrieval_text = generate_hypothetical_doc(rp.query, llm)
+        hyde_doc = retrieval_text
     else:
         retrieval_text = rp.query
+        hyde_doc = None
 
     if isinstance(retriever, RetrieverHybrid):
         results = retriever.retrieve(retrieval_text, top_k=retrieval_k, fusion=rp.fusion, alpha=rp.alpha)
@@ -63,4 +66,4 @@ def answer_query(
 
     contexts = [r["text"] for r in results]
     answer = llm.generate(build_prompt_rag(rp.query, contexts))
-    return {"answer": answer, "chunks": results}
+    return {"answer": answer, "chunks": results, "hyde_doc": hyde_doc}

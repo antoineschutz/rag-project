@@ -90,6 +90,23 @@ Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup t
 | `POST /evaluate` | score a config over the keyword-graded QA set (`accuracy_29`, optional LLM judge). A known preset `name` wins; pass an inline `config` under a non-preset name to score a custom config |
 | `POST /compare` | run one query through two configs and return both answers and chunks side by side |
 
+## Dashboard
+
+A Streamlit dashboard (`dashboard/`) provides a browser UI over the API. It is presentation only: every page calls the FastAPI server, so the pipeline stays decoupled from the UI. Run both processes from the repo root:
+
+```bash
+uvicorn src.api.server:app --reload   # terminal 1: the API
+streamlit run dashboard/Home.py       # terminal 2: the UI (opens http://localhost:8501)
+```
+
+Three pages:
+
+- **Query**: ask one question, see the answer and the retrieved chunks; pick a preset or send inline overrides.
+- **Compare**: run one question through two configs (e.g. baseline vs no-RAG) side by side.
+- **Evaluate**: chart the benchmark runs logged in MLflow, or trigger a live evaluation over the QA set.
+
+Set `RAG_API_URL` if the API runs somewhere other than `http://127.0.0.1:8000`.
+
 ## Results
 
 Benchmarked on 32 hand-written Q/A pairs (8 difficulty levels) over a corpus of real ML papers plus a few synthetic docs (`phi3`, local). Two qualitative sweep rounds, then a scored benchmark tracked in MLflow:

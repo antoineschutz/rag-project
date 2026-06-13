@@ -46,6 +46,7 @@ class QueryResponse(BaseModel):
     answer: str
     chunks: list[ChunkOut]
     config: dict[str, Any]
+    hyde_doc: str | None = None  # the generated hypothetical passage when HyDE ran, else None
 
 
 class EvaluateRequest(BaseModel):

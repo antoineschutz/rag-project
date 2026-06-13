@@ -118,7 +118,10 @@ def query(req: QueryRequest) -> QueryResponse:
         cfg = req.config.model_dump(exclude_none=True)
 
     result = _run_with_state(req.query, cfg)
-    return QueryResponse(answer=result["answer"], chunks=result["chunks"], config=cfg)
+    return QueryResponse(
+        answer=result["answer"], chunks=result["chunks"], config=cfg,
+        hyde_doc=result.get("hyde_doc"),
+    )
 
 
 @app.post("/evaluate", response_model=EvaluateResponse)
