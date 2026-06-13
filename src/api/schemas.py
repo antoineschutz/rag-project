@@ -1,6 +1,6 @@
 """Pydantic request/response models for the API."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -28,11 +28,23 @@ class QueryConfig(BaseModel):
     model: str | None = Field(None, description="LLM model name override.")
 
 
+class Turn(BaseModel):
+    """One prior conversation turn (client-managed history)."""
+
+    role: Literal["user", "assistant"]
+    content: str
+
+
 class QueryRequest(BaseModel):
     query: str = Field(..., description="The question to answer.")
     config: str | QueryConfig | None = Field(
         None,
         description="A preset name (e.g. 'baseline'), inline knob overrides, or omitted to run the best preset.",
+    )
+    history: list[Turn] | None = Field(
+        None,
+        description="Prior turns for multi-turn chat. When given, the question is condensed into a "
+        "standalone query before retrieval. Omit for a single-shot query.",
     )
 
 
@@ -47,6 +59,7 @@ class QueryResponse(BaseModel):
     chunks: list[ChunkOut]
     config: dict[str, Any]
     hyde_doc: str | None = None  # the generated hypothetical passage when HyDE ran, else None
+    standalone_query: str | None = None  # the condensed follow-up when history changed it, else None
 
 
 class EvaluateRequest(BaseModel):

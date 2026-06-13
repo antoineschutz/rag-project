@@ -63,13 +63,13 @@ def test_answer_query_stream_meta_then_tokens(monkeypatch):
     ret = _Retriever()
     events = list(answer_query_stream(ret, RetrievalParams(query="q"), GenerationParams()))
 
-    assert events[0] == {"type": "meta", "chunks": ret.results, "hyde_doc": None}
+    assert events[0] == {"type": "meta", "chunks": ret.results, "hyde_doc": None, "standalone_query": None}
     assert [e["text"] for e in events[1:]] == ["A", "B"]
     assert all(e["type"] == "token" for e in events[1:])
 
 
 def test_query_stream_endpoint_frames_meta_and_tokens(monkeypatch):
-    def fake_stream(retriever, rp, gp, reranker=None):
+    def fake_stream(retriever, rp, gp, reranker=None, history=None):
         yield {"type": "meta", "chunks": [{"text": "c", "source": "s", "score": 1.0}], "hyde_doc": None}
         yield {"type": "token", "text": "Hel"}
         yield {"type": "token", "text": "lo"}
@@ -89,7 +89,7 @@ def test_query_stream_endpoint_frames_meta_and_tokens(monkeypatch):
 
 
 def test_query_stream_endpoint_reports_midstream_error(monkeypatch):
-    def boom(retriever, rp, gp, reranker=None):
+    def boom(retriever, rp, gp, reranker=None, history=None):
         yield {"type": "meta", "chunks": [], "hyde_doc": None}
         raise RuntimeError("kaboom")
 

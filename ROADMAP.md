@@ -85,7 +85,7 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 **Why:** P makes responses feel live instead of waiting for the full generation; T lets follow-up questions reference earlier turns. Neither needs infrastructure changes.
 
 - [x] **P. Streaming LLM output.** Stream tokens as they are generated across the CLI (stdout), the API (`POST /query/stream`, NDJSON), and the Streamlit dashboard, instead of waiting for the full response. *(Low: generator patterns, streaming APIs)*
-- [ ] **T. Conversation memory.** Maintain chat history so follow-up questions work in context. *(Medium: stateful pipelines)*
+- [x] **T. Conversation memory.** Client-managed chat history (Streamlit session) sent with each request; the stateless server condenses a follow-up into a standalone query before retrieval so context-dependent questions work. New `Chat` dashboard page. *(Medium: stateful pipelines)*
 
 ---
 

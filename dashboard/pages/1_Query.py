@@ -1,11 +1,9 @@
 """Query page: ask one question and see the answer plus the retrieved chunks."""
 
-from typing import Any
-
 import streamlit as st
 
 from api_client import APIError, get_presets, post_query_stream
-from ui import render_chunks, render_hyde_doc
+from ui import config_selector, render_chunks, render_hyde_doc
 
 st.title("Query")
 st.write("Ask one question. Use a preset, or switch to Advanced to set an inline config.")
@@ -16,27 +14,9 @@ except APIError as exc:
     st.error(str(exc))
     st.stop()
 
-mode = st.radio("Configuration", ["Preset", "Advanced"], horizontal=True)
-
-config: str | dict[str, Any]
-if mode == "Preset":
-    names = sorted(presets)
-    config = st.selectbox("Preset", names, index=names.index("best") if "best" in names else 0)
-else:
-    backend = st.selectbox("backend", ["ollama", "gpt"])
-    if backend == "gpt":
-        st.caption("gpt needs OPENAI_API_KEY set on the server.")
-
-    # The retrieval knobs (and HyDE) are greyed when no_rag is on; they have no effect without retrieval.
-    no_rag = st.checkbox("no_rag (skip retrieval)")
-    retriever = st.selectbox("retriever", ["dense", "bm25", "hybrid"], disabled=no_rag)
-    top_k = st.slider("top_k", min_value=1, max_value=50, value=15, disabled=no_rag)
-    rerank = st.checkbox("rerank (cross-encoder)", disabled=no_rag)
-    hyde = st.checkbox("hyde (embed a hypothetical answer)", disabled=no_rag)
-
-    config = {"no_rag": no_rag, "backend": backend}
-    if not no_rag:
-        config.update({"retriever": retriever, "top_k": top_k, "rerank": rerank, "hyde": hyde})
+with st.sidebar:
+    st.header("Configuration")
+    config = config_selector(presets, key="query")
 
 query = st.text_area("Question", placeholder="What is the difference between RAG-Sequence and RAG-Token?")
 

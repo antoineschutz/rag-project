@@ -61,24 +61,37 @@ def get_presets() -> dict[str, dict[str, Any]]:
     return _request("GET", "/presets")
 
 
-def post_query(query: str, config: str | dict[str, Any] | None) -> dict[str, Any]:
-    """Run one query. `config` is a preset name, inline knob dict, or None (best preset)."""
-    return _request("POST", "/query", json={"query": query, "config": config}, timeout=QUERY_TIMEOUT)
+def post_query(
+    query: str, config: str | dict[str, Any] | None,
+    history: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Run one query. `config` is a preset name, inline knob dict, or None (best preset).
+
+    `history` is the prior chat turns (each {role, content}) for multi-turn; omit for single-shot.
+    """
+    return _request(
+        "POST", "/query",
+        json={"query": query, "config": config, "history": history}, timeout=QUERY_TIMEOUT,
+    )
 
 
 def post_query_stream(
-    query: str, config: str | dict[str, Any] | None
+    query: str, config: str | dict[str, Any] | None,
+    history: list[dict[str, str]] | None = None,
 ) -> tuple[dict[str, Any], Iterator[str]]:
     """Run one query against /query/stream. Return (meta, tokens).
 
-    meta holds chunks/config/hyde_doc (received before generation starts); tokens yields the
-    answer text chunks as they arrive. Raises APIError on connection/timeout/non-200, or if the
-    server reports an error event.
+    meta holds chunks/config/hyde_doc/standalone_query (received before generation starts); tokens
+    yields the answer text chunks as they arrive. `history` is the prior chat turns (each
+    {role, content}) for multi-turn; omit for single-shot. Raises APIError on connection/timeout/
+    non-200, or if the server reports an error event.
     """
     url = f"{API_URL}/query/stream"
     try:
         resp = requests.post(
-            url, json={"query": query, "config": config}, stream=True, timeout=QUERY_TIMEOUT
+            url,
+            json={"query": query, "config": config, "history": history},
+            stream=True, timeout=QUERY_TIMEOUT,
         )
     except requests.exceptions.ConnectionError as exc:
         raise APIError(

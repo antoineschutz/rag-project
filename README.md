@@ -99,11 +99,12 @@ uvicorn src.api.server:app --reload   # terminal 1: the API
 streamlit run dashboard/Home.py       # terminal 2: the UI (opens http://localhost:8501)
 ```
 
-Three pages:
+Four pages:
 
 - **Query**: ask one question, see the answer and the retrieved chunks; pick a preset or send inline overrides.
 - **Compare**: run one question through two configs (e.g. baseline vs no-RAG) side by side.
 - **Evaluate**: chart the benchmark runs logged in MLflow, or trigger a live evaluation over the QA set.
+- **Chat**: multi-turn conversation; follow-up questions are condensed into a standalone query against the history before retrieval.
 
 Set `RAG_API_URL` if the API runs somewhere other than `http://127.0.0.1:8000`.
 

@@ -81,10 +81,17 @@ def _build_pipeline(query_text: str, cfg: dict[str, Any]):
     return retriever, rp, gp, reranker
 
 
-def _run_with_state(query_text: str, cfg: dict[str, Any]) -> dict[str, Any]:
+def _run_with_state(
+    query_text: str, cfg: dict[str, Any], history: list[dict[str, str]] | None = None
+) -> dict[str, Any]:
     """Run one query (non-streaming) over the memoized retriever/reranker for this config."""
     retriever, rp, gp, reranker = _build_pipeline(query_text, cfg)
-    return answer_query(retriever, rp, gp, reranker=reranker)
+    return answer_query(retriever, rp, gp, reranker=reranker, history=history)
+
+
+def _history(req: QueryRequest) -> list[dict[str, str]] | None:
+    """Flatten the request's typed history turns into the plain dicts the pipeline expects."""
+    return [t.model_dump() for t in req.history] if req.history else None
 
 
 def _resolve_config(ref: str | dict[str, Any]) -> dict[str, Any]:
@@ -128,10 +135,10 @@ def query(req: QueryRequest) -> QueryResponse:
     inline knob overrides (unspecified knobs fall back to the base config defaults).
     """
     cfg = _query_config(req)
-    result = _run_with_state(req.query, cfg)
+    result = _run_with_state(req.query, cfg, _history(req))
     return QueryResponse(
         answer=result["answer"], chunks=result["chunks"], config=cfg,
-        hyde_doc=result.get("hyde_doc"),
+        hyde_doc=result.get("hyde_doc"), standalone_query=result.get("standalone_query"),
     )
 
 
@@ -139,17 +146,18 @@ def query(req: QueryRequest) -> QueryResponse:
 def query_stream(req: QueryRequest) -> StreamingResponse:
     """Run one query and stream the answer as newline-delimited JSON (NDJSON).
 
-    Config selection is identical to /query. The first line is
-    {"type": "meta", "chunks": [...], "config": {...}, "hyde_doc": ...}, followed by one
-    {"type": "token", "text": ...} per generated chunk. If generation fails mid-stream a
-    final {"type": "error", "detail": ...} line is emitted.
+    Config selection is identical to /query; pass `history` for multi-turn chat. The first line is
+    {"type": "meta", "chunks": [...], "config": {...}, "hyde_doc": ..., "standalone_query": ...},
+    followed by one {"type": "token", "text": ...} per generated chunk. If generation fails
+    mid-stream a final {"type": "error", "detail": ...} line is emitted.
     """
     cfg = _query_config(req)
     retriever, rp, gp, reranker = _build_pipeline(req.query, cfg)
+    history = _history(req)
 
     def ndjson() -> Iterator[str]:
         try:
-            for event in answer_query_stream(retriever, rp, gp, reranker=reranker):
+            for event in answer_query_stream(retriever, rp, gp, reranker=reranker, history=history):
                 if event["type"] == "meta":
                     event = {**event, "config": cfg}
                 yield json.dumps(event) + "\n"
