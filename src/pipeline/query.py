@@ -7,6 +7,7 @@ per query.
 """
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 from src.config import GenerationParams, RetrievalParams, env
@@ -19,24 +20,22 @@ from src.llm.client import LLMClient
 logger = logging.getLogger(__name__)
 
 
-def answer_query(
+def _prepare(
     retriever: Retriever | None,
     rp: RetrievalParams,
     gp: GenerationParams,
-    reranker: Reranker | None = None,
-) -> dict[str, Any]:
-    """Answer one query, either from the model alone (no-RAG) or over a built retriever.
+    reranker: Reranker | None,
+) -> tuple[list[dict[str, Any]], str | None, str, LLMClient]:
+    """Run retrieval/rerank/HyDE and build the prompt; return (chunks, hyde_doc, prompt, llm).
 
-    When `gp.no_rag` is set, retrieval is skipped and `retriever` may be None. Otherwise a
-    retriever is required (a None retriever with no_rag=False is a caller bug and raises).
-    Returns {"answer": str, "chunks": list[{"text", "source", "score"}], "hyde_doc": str | None}
-    (empty chunks and hyde_doc=None for the no-RAG path; hyde_doc holds the generated passage when
-    HyDE ran). `reranker` is injected for reuse; built lazily when None.
+    Shared by answer_query and answer_query_stream so the two differ only in how they call the
+    LLM. When `gp.no_rag` is set, retrieval is skipped (chunks empty, hyde_doc None) and
+    `retriever` may be None; otherwise a None retriever is a caller bug and raises.
     """
     llm = LLMClient(backend=gp.backend or env.LLM_BACKEND, model=gp.model, num_ctx=gp.num_ctx)
 
     if gp.no_rag:
-        return {"answer": llm.generate(build_prompt_no_rag(rp.query)), "chunks": [], "hyde_doc": None}
+        return [], None, build_prompt_no_rag(rp.query), llm
 
     if retriever is None:
         raise ValueError(
@@ -65,5 +64,38 @@ def answer_query(
         results = (reranker or Reranker()).rerank(rp.query, results, top_k=rp.top_k)
 
     contexts = [r["text"] for r in results]
-    answer = llm.generate(build_prompt_rag(rp.query, contexts))
-    return {"answer": answer, "chunks": results, "hyde_doc": hyde_doc}
+    return results, hyde_doc, build_prompt_rag(rp.query, contexts), llm
+
+
+def answer_query(
+    retriever: Retriever | None,
+    rp: RetrievalParams,
+    gp: GenerationParams,
+    reranker: Reranker | None = None,
+) -> dict[str, Any]:
+    """Answer one query, either from the model alone (no-RAG) or over a built retriever.
+
+    Returns {"answer": str, "chunks": list[{"text", "source", "score"}], "hyde_doc": str | None}
+    (empty chunks and hyde_doc=None for the no-RAG path; hyde_doc holds the generated passage when
+    HyDE ran). `reranker` is injected for reuse; built lazily when None.
+    """
+    chunks, hyde_doc, prompt, llm = _prepare(retriever, rp, gp, reranker)
+    return {"answer": llm.generate(prompt), "chunks": chunks, "hyde_doc": hyde_doc}
+
+
+def answer_query_stream(
+    retriever: Retriever | None,
+    rp: RetrievalParams,
+    gp: GenerationParams,
+    reranker: Reranker | None = None,
+) -> Iterator[dict[str, Any]]:
+    """Answer one query, streaming the response token by token.
+
+    Retrieval/rerank/HyDE finish first, then generation streams. Yields exactly one meta event
+    {"type": "meta", "chunks": [...], "hyde_doc": str | None} followed by one
+    {"type": "token", "text": str} per generated chunk.
+    """
+    chunks, hyde_doc, prompt, llm = _prepare(retriever, rp, gp, reranker)
+    yield {"type": "meta", "chunks": chunks, "hyde_doc": hyde_doc}
+    for delta in llm.generate_stream(prompt):
+        yield {"type": "token", "text": delta}

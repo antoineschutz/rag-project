@@ -4,7 +4,7 @@ from typing import Any
 
 import streamlit as st
 
-from api_client import APIError, get_presets, post_query
+from api_client import APIError, get_presets, post_query_stream
 from ui import render_chunks, render_hyde_doc
 
 st.title("Query")
@@ -45,19 +45,19 @@ if st.button("Run", type="primary"):
         st.warning("Enter a question first.")
         st.stop()
     try:
-        with st.spinner("Running the pipeline..."):
-            result = post_query(query, config)
+        with st.spinner("Retrieving..."):
+            meta, tokens = post_query_stream(query, config)
+
+        st.subheader("Answer")
+        st.write_stream(tokens)  # renders tokens live as they arrive
     except APIError as exc:
         st.error(str(exc))
         st.stop()
 
-    st.subheader("Answer")
-    st.write(result["answer"])
-
-    render_hyde_doc(result.get("hyde_doc"))
+    render_hyde_doc(meta.get("hyde_doc"))
 
     st.subheader("Retrieved chunks")
-    render_chunks(result["chunks"])
+    render_chunks(meta["chunks"])
 
     with st.expander("Resolved config"):
-        st.json(result["config"])
+        st.json(meta["config"])

@@ -84,7 +84,7 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 **Why:** P makes responses feel live instead of waiting for the full generation; T lets follow-up questions reference earlier turns. Neither needs infrastructure changes.
 
-- [ ] **P. Streaming LLM output.** Stream Ollama/OpenAI tokens to stdout instead of waiting for the full response. *(Low: generator patterns, streaming APIs)*
+- [x] **P. Streaming LLM output.** Stream tokens as they are generated across the CLI (stdout), the API (`POST /query/stream`, NDJSON), and the Streamlit dashboard, instead of waiting for the full response. *(Low: generator patterns, streaming APIs)*
 - [ ] **T. Conversation memory.** Maintain chat history so follow-up questions work in context. *(Medium: stateful pipelines)*
 
 ---

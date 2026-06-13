@@ -2,7 +2,7 @@ import argparse
 import logging
 
 from src.config import split_config
-from src.pipeline import answer_query
+from src.pipeline import answer_query, answer_query_stream
 from src.retrieval.factory import build_index
 
 
@@ -70,6 +70,12 @@ def main() -> None:
         dest="num_ctx",
         help="Ollama context window in tokens (default: env.OLLAMA_NUM_CTX = 4096)",
     )
+    parser.add_argument(
+        "--stream",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Stream the answer to stdout token by token (default: on; use --no-stream to disable)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
@@ -80,10 +86,16 @@ def main() -> None:
     index_params, retrieval_params, generation_params = split_config(vars(args), args.query)
 
     retriever = None if generation_params.no_rag else build_index(index_params)
-    result = answer_query(retriever, retrieval_params, generation_params)
 
     print("\nANSWER:\n")
-    print(result["answer"])
+    if args.stream:
+        for event in answer_query_stream(retriever, retrieval_params, generation_params):
+            if event["type"] == "token":
+                print(event["text"], end="", flush=True)
+        print()
+    else:
+        result = answer_query(retriever, retrieval_params, generation_params)
+        print(result["answer"])
 
 
 if __name__ == "__main__":

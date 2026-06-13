@@ -7,13 +7,16 @@ Endpoints: /health, /query (answer + retrieved chunks),
 /evaluate (score a config over the QA set), /compare (one query across two configs).
 """
 
+import json
 import logging
+from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
-from src.pipeline import answer_query
+from src.pipeline import answer_query, answer_query_stream
 from src.config import PRESETS, IndexParams, as_config_dict, env, split_config
 from src.api import state
 from src.api.schemas import (
@@ -64,18 +67,23 @@ app = FastAPI(
 )
 
 
-def _run_with_state(query_text: str, cfg: dict[str, Any]) -> dict[str, Any]:
-    """Run one query, reusing the memoized retriever/reranker for this config.
+def _build_pipeline(query_text: str, cfg: dict[str, Any]):
+    """Resolve cfg into (retriever, rp, gp, reranker), reusing the memoized retriever/reranker.
 
-    `cfg` is a (possibly sparse) flat config (a PRESETS entry or a QueryRequest dump).
-    Dropping None lets each param group apply its own default. The retriever is fetched
-    from the in-process cache (built once, reused across requests); this is the two-phase
-    interface, so no per-call injection into the pipeline is needed.
+    `cfg` is a (possibly sparse) flat config (a PRESETS entry or a QueryRequest dump). Dropping
+    None lets each param group apply its own default. The retriever is fetched from the in-process
+    cache (built once, reused across requests); this is the two-phase interface, so no per-call
+    injection into the pipeline is needed.
     """
     index_params, rp, gp = split_config(cfg, query_text)
-
     retriever = None if gp.no_rag else state.get_retriever(index_params)
     reranker = state.get_reranker() if (rp.rerank and not gp.no_rag) else None
+    return retriever, rp, gp, reranker
+
+
+def _run_with_state(query_text: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    """Run one query (non-streaming) over the memoized retriever/reranker for this config."""
+    retriever, rp, gp, reranker = _build_pipeline(query_text, cfg)
     return answer_query(retriever, rp, gp, reranker=reranker)
 
 
@@ -103,6 +111,15 @@ def presets() -> dict[str, dict[str, Any]]:
     return {name: as_config_dict(pc) for name, pc in PRESETS.items()}
 
 
+def _query_config(req: QueryRequest) -> dict[str, Any]:
+    """Resolve QueryRequest.config: None -> best preset, str -> named preset, QueryConfig -> set knobs."""
+    if req.config is None:
+        return as_config_dict(PRESETS["best"])
+    if isinstance(req.config, str):
+        return _resolve_config(req.config)  # validates the preset name (400 if unknown)
+    return req.config.model_dump(exclude_none=True)  # keep only the knobs the caller actually set
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
     """Run one query and return the answer plus retrieved chunks.
@@ -110,18 +127,36 @@ def query(req: QueryRequest) -> QueryResponse:
     `config` selects the pipeline: omit it for the best preset, pass a preset name, or pass
     inline knob overrides (unspecified knobs fall back to the base config defaults).
     """
-    if req.config is None:
-        cfg = as_config_dict(PRESETS["best"])
-    elif isinstance(req.config, str):
-        cfg = _resolve_config(req.config)  # validates the preset name (400 if unknown)
-    else:  # QueryConfig: keep only the knobs the caller actually set
-        cfg = req.config.model_dump(exclude_none=True)
-
+    cfg = _query_config(req)
     result = _run_with_state(req.query, cfg)
     return QueryResponse(
         answer=result["answer"], chunks=result["chunks"], config=cfg,
         hyde_doc=result.get("hyde_doc"),
     )
+
+
+@app.post("/query/stream")
+def query_stream(req: QueryRequest) -> StreamingResponse:
+    """Run one query and stream the answer as newline-delimited JSON (NDJSON).
+
+    Config selection is identical to /query. The first line is
+    {"type": "meta", "chunks": [...], "config": {...}, "hyde_doc": ...}, followed by one
+    {"type": "token", "text": ...} per generated chunk. If generation fails mid-stream a
+    final {"type": "error", "detail": ...} line is emitted.
+    """
+    cfg = _query_config(req)
+    retriever, rp, gp, reranker = _build_pipeline(req.query, cfg)
+
+    def ndjson() -> Iterator[str]:
+        try:
+            for event in answer_query_stream(retriever, rp, gp, reranker=reranker):
+                if event["type"] == "meta":
+                    event = {**event, "config": cfg}
+                yield json.dumps(event) + "\n"
+        except Exception as exc:  # already-streaming: report via an error line, not a 500
+            yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(ndjson(), media_type="application/x-ndjson")
 
 
 @app.post("/evaluate", response_model=EvaluateResponse)
