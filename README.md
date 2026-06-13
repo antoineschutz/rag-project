@@ -87,7 +87,6 @@ Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup t
 | `GET /health` | liveness check |
 | `GET /presets` | list the named presets (`baseline`, `best`, `no-rag`) and their configs |
 | `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides, or omit `config` for the best preset |
-| `POST /upload` | add a PDF/Markdown/text/DOCX file to the corpus; invalidates the cache so the index rebuilds on the next query |
 | `POST /evaluate` | score a config over the keyword-graded QA set (`accuracy_29`, optional LLM judge). A known preset `name` wins; pass an inline `config` under a non-preset name to score a custom config |
 | `POST /compare` | run one query through two configs and return both answers and chunks side by side |
 

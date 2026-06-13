@@ -3,17 +3,15 @@
 Run with:
     uvicorn src.api.server:app --reload
 
-Endpoints: /health, /query (answer + retrieved chunks), /upload (ingest a document),
+Endpoints: /health, /query (answer + retrieved chunks),
 /evaluate (score a config over the QA set), /compare (one query across two configs).
 """
 
 import logging
-import shutil
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 
 from src.pipeline import answer_query
 from src.config import PRESETS, IndexParams, as_config_dict, env, split_config
@@ -26,12 +24,7 @@ from src.api.schemas import (
     EvaluateResponse,
     QueryRequest,
     QueryResponse,
-    UploadResponse,
 )
-from src.utils.cache import clear_all_cache
-
-# Extensions load_documents() can actually ingest (see globs in src/ingestion/loader.py).
-SUPPORTED_EXTENSIONS = {".pdf", ".md", ".txt", ".docx"}
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +58,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RAG pipeline API",
-    description="HTTP interface to a from-scratch RAG pipeline (query, upload, evaluate, compare).",
+    description="HTTP interface to a from-scratch RAG pipeline (query, evaluate, compare).",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -126,33 +119,6 @@ def query(req: QueryRequest) -> QueryResponse:
 
     result = _run_with_state(req.query, cfg)
     return QueryResponse(answer=result["answer"], chunks=result["chunks"], config=cfg)
-
-
-@app.post("/upload", response_model=UploadResponse)
-def upload(file: UploadFile = File(...)) -> UploadResponse:
-    """Save an uploaded document to the data dir and invalidate the cache (lazy re-index)."""
-    name = Path(file.filename or "").name
-    ext = Path(name).suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{ext}'. Supported: {sorted(SUPPORTED_EXTENSIONS)}",
-        )
-
-    dest = Path(env.DATA_PATH) / name
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with open(dest, "wb") as out:
-        shutil.copyfileobj(file.file, out)
-
-    # Corpus changed: drop every config's on-disk cache and the in-process retrievers.
-    clear_all_cache()
-    state.reset()
-
-    return UploadResponse(
-        filename=name,
-        status="ok",
-        message="Uploaded; index will rebuild on the next query.",
-    )
 
 
 @app.post("/evaluate", response_model=EvaluateResponse)

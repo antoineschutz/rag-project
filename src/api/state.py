@@ -4,9 +4,9 @@ Loading a SentenceTransformer embedder or a cross-encoder reranker takes seconds
 so the API caches them across requests instead of rebuilding per call. Built
 retrievers are cached too, keyed by the full set of knobs that affect the index.
 
-`reset()` is called by /upload after the corpus changes: it drops the retriever
-cache (the indexes are now stale) but keeps the embedder and reranker, which are
-data independent and expensive to reload.
+`reset()` drops the retriever cache when the corpus changes (the indexes are now
+stale) but keeps the embedder and reranker, which are data independent and
+expensive to reload.
 """
 
 import threading

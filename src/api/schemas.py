@@ -48,12 +48,6 @@ class QueryResponse(BaseModel):
     config: dict[str, Any]
 
 
-class UploadResponse(BaseModel):
-    filename: str
-    status: str
-    message: str
-
-
 class EvaluateRequest(BaseModel):
     name: str = Field("best", description="Preset name from src/config; a known preset wins and `config` is ignored.")
     config: dict[str, Any] | None = Field(
