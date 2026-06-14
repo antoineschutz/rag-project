@@ -1,4 +1,4 @@
-"""The benchmark question set, shared by scripts/eval.py and scripts/benchmark.py."""
+"""The benchmark question set, shared by scripts/benchmark.py and the API evaluate path."""
 
 from typing import Any
 

@@ -13,3 +13,5 @@ docs/
 mlruns/
 mlflow.db
 eval_results*/*.log
+
+bench_overnight.log

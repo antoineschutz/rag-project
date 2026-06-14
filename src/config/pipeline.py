@@ -8,7 +8,7 @@ lower_snake so asdict() yields the flat config dicts the pipeline consumes (Inde
 etc.). `as_config_dict` flattens a PipelineConfig (or passes a dict through).
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 
@@ -40,10 +40,38 @@ BEST = PipelineConfig(
 )
 NO_RAG = PipelineConfig(no_rag=True)
 
+# Retrieval off, generate with OpenAI (the parametric-knowledge ceiling for the GPT model).
+NO_RAG_GPT = replace(NO_RAG, backend="gpt")
+
+# BEST retrieval, but generate with OpenAI instead of Ollama (model defers to env.OPENAI_MODEL).
+GPT = replace(BEST, backend="gpt")
+
+# Smallest/fastest path: MiniLM dense, few short chunks, no rerank.
+LIGHTWEIGHT = PipelineConfig(top_k=5, chunk_max_tokens=64)
+
+# Lexical-only baseline (no embeddings).
+BM25 = PipelineConfig(retriever="bm25")
+
+# Dense + BM25 fused, without the cross-encoder rerank that BEST adds.
+HYBRID = PipelineConfig(retriever="hybrid", fusion="rrf", alpha=0.5)
+
+# Query-side HyDE expansion on top of the dense baseline.
+HYDE = PipelineConfig(hyde=True)
+
+# FAISS vector store with an IVF index instead of the numpy/flat default.
+FAISS = PipelineConfig(store="faiss", index_type="ivf")
+
 PRESETS: dict[str, PipelineConfig] = {
     "no-rag": NO_RAG,
+    "no-rag-gpt": NO_RAG_GPT,
     "baseline": BASE,  # the default pipeline is the baseline preset
     "best": BEST,
+    "gpt": GPT,
+    "lightweight": LIGHTWEIGHT,
+    "bm25": BM25,
+    "hybrid": HYBRID,
+    "hyde": HYDE,
+    "faiss": FAISS,
 }
 
 
