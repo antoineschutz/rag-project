@@ -34,10 +34,14 @@ Does the candidate state the key fact(s) of the reference answer correctly? Igno
 
 def build_prompt_rag(query: str, contexts: list[str]) -> str:
     context_text = "\n\n".join(contexts)
-    return f"""Answer the question below. Use the context when it is relevant; it may contain
-information you do not have. If the context does not contain the answer, answer from
-your own knowledge instead and begin that part with "From general knowledge:".
-If you are unsure, say so.
+    return f"""Answer the question using only the context below.
+
+Before answering:
+1. Find the exact place in the context that addresses the question (for a table, the specific row and column).
+2. If the question asks for the highest, lowest, or best value, compare all the relevant rows.
+3. Read off the precise value(s) for every quantity the question asks for; do not round, approximate, substitute a neighbouring cell, or invent figures.
+
+Give the answer in one line, quoting the exact names and numbers from the context. If the context does not contain the answer, begin with "From general knowledge:" and then answer.
 
 Context:
 
