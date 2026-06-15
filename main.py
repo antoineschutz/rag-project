@@ -10,7 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the RAG pipeline.")
     parser.add_argument("--query", required=True, help="Question to ask the model")
     parser.add_argument("--data-path", default=None, help="Path to PDF data directory")
-    parser.add_argument("--backend", choices=["ollama", "gpt"], default=None, help="LLM backend")
+    parser.add_argument("--backend", choices=["ollama", "gpt", "groq"], default=None, help="LLM backend")
     parser.add_argument("--model", default=None, help="Model name override")
     parser.add_argument("--embed-model", default=None, dest="embed_model",
                         help="Sentence-transformers embedding model (overrides config)")

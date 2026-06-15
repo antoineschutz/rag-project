@@ -19,6 +19,8 @@ class RAGEnvConfig:
     LLM_BACKEND: str = "ollama"
     OLLAMA_MODEL: str = "phi3"
     OPENAI_MODEL: str = "gpt-4o-mini"
+    # Groq serves open models behind an OpenAI-compatible API (fast, free tier); needs GROQ_API_KEY.
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
     OLLAMA_NUM_CTX: int = 4096  # phi3 supports up to 131072; override via --num-ctx or a config
     # Presets the API warms at startup (loads models + builds indexes) so the first request
     # is not cold. Set to () to disable (e.g. for fast dev / uvicorn --reload startup).
