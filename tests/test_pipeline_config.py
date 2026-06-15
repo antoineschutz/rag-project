@@ -20,7 +20,11 @@ def test_best_and_no_rag_values():
 
 
 def test_presets_registry():
-    assert set(PRESETS) == {"no-rag", "baseline", "best"}
+    assert set(PRESETS) == {
+        "no-rag", "no-rag-gpt", "baseline", "best", "gpt",
+        "llama3.1-8b", "no-rag-llama3.1-8b",
+        "lightweight", "bm25", "hybrid", "hyde", "faiss",
+    }
     # baseline is literally the default pipeline; best/no-rag are the variants
     assert PRESETS["baseline"] is BASE
     assert PRESETS["best"] is BEST

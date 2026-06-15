@@ -46,6 +46,12 @@ NO_RAG_GPT = replace(NO_RAG, backend="gpt")
 # BEST retrieval, but generate with OpenAI instead of Ollama (model defers to env.OPENAI_MODEL).
 GPT = replace(BEST, backend="gpt")
 
+# BEST retrieval, generate with Llama-3.1-8B (served via the Groq OpenAI-compatible backend).
+LLAMA31_8B = replace(BEST, backend="groq", model="llama-3.1-8b-instant")
+
+# Retrieval off, generate with Llama-3.1-8B (the parametric-knowledge ceiling for that model).
+NO_RAG_LLAMA31_8B = replace(NO_RAG, backend="groq", model="llama-3.1-8b-instant")
+
 # Smallest/fastest path: MiniLM dense, few short chunks, no rerank.
 LIGHTWEIGHT = PipelineConfig(top_k=5, chunk_max_tokens=64)
 
@@ -67,6 +73,8 @@ PRESETS: dict[str, PipelineConfig] = {
     "baseline": BASE,  # the default pipeline is the baseline preset
     "best": BEST,
     "gpt": GPT,
+    "llama3.1-8b": LLAMA31_8B,
+    "no-rag-llama3.1-8b": NO_RAG_LLAMA31_8B,
     "lightweight": LIGHTWEIGHT,
     "bm25": BM25,
     "hybrid": HYBRID,
