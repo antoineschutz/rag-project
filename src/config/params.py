@@ -35,7 +35,7 @@ class IndexParams:
     data_path: str = env.DATA_PATH
     retriever: str = BASE.retriever  # dense | bm25 | hybrid
     embed_model: str = BASE.embed_model
-    store: str = BASE.store  # numpy | faiss
+    store: str = BASE.store  # numpy | faiss | qdrant
     index_type: str = BASE.index_type  # flat | ivf
     chunk_max_tokens: int = BASE.chunk_max_tokens
     chunk_overlap: int = BASE.chunk_overlap  # present for completeness, not yet wired
@@ -58,6 +58,8 @@ class RetrievalParams:
     hyde: bool = BASE.hyde
     fusion: str = BASE.fusion  # rrf | weighted (hybrid only)
     alpha: float = BASE.alpha  # dense weight for weighted fusion (hybrid only)
+    # Restrict retrieval to these document sources (filenames); None = all sources.
+    source: str | list[str] | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "RetrievalParams":

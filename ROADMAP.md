@@ -89,14 +89,14 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 ---
 
-## V8: Vector database backend
+## V8: Vector database backend (done)
 
 **Theme:** add Qdrant as a third dense backend alongside numpy and FAISS.
 
 **Why:** Qdrant handles vectors, metadata, and CRUD in one service. Adding it as a selectable dense store (`numpy` / `faiss` / `qdrant`) makes metadata filtering first-class while leaving the existing backends in place as options. Q requires J.
 
-- [ ] **J. Qdrant vector database.** Add a `store=qdrant` dense backend selectable via config: store each chunk as a point `{id, vector, payload}` with text and source in the payload. Dense-only at first; numpy and FAISS stay as alternatives. *(Medium: vector databases, Qdrant)*
-- [ ] **Q. Metadata filtering.** Let `retriever.retrieve()` filter by source before ranking; trivial with Qdrant payload filters, awkward without one. *(Low: metadata, search filters)*
+- [x] **J. Qdrant vector database.** Add a `store=qdrant` dense backend selectable via config: store each chunk as a point `{id, vector, payload}` with text and source in the payload. Dense-only at first; numpy and FAISS stay as alternatives. In-process by default; `QDRANT_URL` connects to a persistent server and reuses an existing collection (no re-upsert) so it stays fast at scale. *(Medium: vector databases, Qdrant)*
+- [x] **Q. Metadata filtering.** Let `retriever.retrieve()` filter by source before ranking; native via Qdrant payload filters, and supported across the numpy / FAISS / BM25 / hybrid backends too. *(Low: metadata, search filters)*
 
 ---
 

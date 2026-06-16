@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from api_client import APIError, get_presets, post_query_stream
+from api_client import APIError, get_presets, get_sources, post_query_stream
 from ui import config_selector, render_chunks, render_hyde_doc
 
 st.title("Query")
@@ -10,13 +10,14 @@ st.write("Ask one question. Use a preset, or switch to Advanced to set an inline
 
 try:
     presets = get_presets()
+    sources = get_sources()
 except APIError as exc:
     st.error(str(exc))
     st.stop()
 
 with st.sidebar:
     st.header("Configuration")
-    config = config_selector(presets, key="query")
+    config = config_selector(presets, sources=sources, key="query")
 
 query = st.text_area("Question", placeholder="What is the difference between RAG-Sequence and RAG-Token?")
 

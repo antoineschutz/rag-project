@@ -24,7 +24,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--store",
-        choices=["numpy", "faiss"],
+        choices=["numpy", "faiss", "qdrant"],
         default="numpy",
         help="Storage and retrieval backend (default: numpy)",
     )
@@ -62,6 +62,12 @@ def main() -> None:
         "--hyde",
         action="store_true",
         help="Use HyDE: embed a hypothetical answer passage instead of the raw query",
+    )
+    parser.add_argument(
+        "--source",
+        nargs="+",
+        default=None,
+        help="Restrict retrieval to these document sources (filenames); default: all sources",
     )
     parser.add_argument(
         "--num-ctx",

@@ -77,9 +77,9 @@ def _prepare(
         hyde_doc = None
 
     if isinstance(retriever, RetrieverHybrid):
-        results = retriever.retrieve(retrieval_text, top_k=retrieval_k, fusion=rp.fusion, alpha=rp.alpha)
+        results = retriever.retrieve(retrieval_text, top_k=retrieval_k, source=rp.source, fusion=rp.fusion, alpha=rp.alpha)
     else:
-        results = retriever.retrieve(retrieval_text, top_k=retrieval_k)
+        results = retriever.retrieve(retrieval_text, top_k=retrieval_k, source=rp.source)
 
     if rp.rerank:
         results = (reranker or Reranker()).rerank(standalone, results, top_k=rp.top_k)

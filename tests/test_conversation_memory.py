@@ -41,8 +41,8 @@ class _Retriever:
         self.results = results or [{"text": "ctx-a", "source": "a", "score": 0.9}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k):
-        self.calls.append({"query": query, "top_k": top_k})
+    def retrieve(self, query, top_k, source=None):
+        self.calls.append({"query": query, "top_k": top_k, "source": source})
         return self.results
 
 

@@ -17,7 +17,7 @@ class PipelineConfig:
     """A complete pipeline configuration (i.e. a preset): every tunable knob with a default."""
 
     retriever: str = "dense"  # dense | bm25 | hybrid
-    store: str = "numpy"  # numpy | faiss
+    store: str = "numpy"  # numpy | faiss | qdrant
     index_type: str = "flat"  # flat | ivf
     embed_model: str = "all-MiniLM-L6-v2"
     chunk_max_tokens: int = 128

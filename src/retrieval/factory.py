@@ -11,8 +11,9 @@ from src.retrieval.retriever_bm25 import RetrieverBM25, build_bm25_retriever
 from src.retrieval.retriever_cosine import RetrieverCosine, build_cosine_retriever
 from src.retrieval.retriever_faiss import RetrieverFAISS, build_faiss_retriever
 from src.retrieval.retriever_hybrid import RetrieverHybrid, build_hybrid_retriever
+from src.retrieval.retriever_qdrant import RetrieverQdrant, build_qdrant_retriever
 
-Retriever = RetrieverBM25 | RetrieverCosine | RetrieverFAISS | RetrieverHybrid
+Retriever = RetrieverBM25 | RetrieverCosine | RetrieverFAISS | RetrieverHybrid | RetrieverQdrant
 
 
 def build_index(params: IndexParams, embedder: Embedder | None = None) -> Retriever:
@@ -37,6 +38,10 @@ def build_index(params: IndexParams, embedder: Embedder | None = None) -> Retrie
         return build_faiss_retriever(
             params.data_path, embedder, index_type=params.index_type,
             chunk_max_tokens=params.chunk_max_tokens,
+        )
+    if params.store == "qdrant":
+        return build_qdrant_retriever(
+            params.data_path, embedder, chunk_max_tokens=params.chunk_max_tokens,
         )
     return build_cosine_retriever(
         params.data_path, embedder, chunk_max_tokens=params.chunk_max_tokens,

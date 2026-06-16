@@ -51,7 +51,7 @@ class _Retriever:
     def __init__(self):
         self.results = [{"text": "ctx-a", "source": "a", "score": 0.9}]
 
-    def retrieve(self, query, top_k):
+    def retrieve(self, query, top_k, source=None):
         return self.results
 
 

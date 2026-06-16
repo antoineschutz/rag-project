@@ -6,6 +6,7 @@ from src.embeddings.embed import Embedder
 from src.retrieval.retriever_cosine import RetrieverCosine, build_cosine_retriever
 from src.retrieval.retriever_bm25 import RetrieverBM25, build_bm25_retriever
 from src.retrieval.retriever_faiss import RetrieverFAISS, build_faiss_retriever
+from src.retrieval.retriever_qdrant import RetrieverQdrant, build_qdrant_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class RetrieverHybrid:
 
     def __init__(
         self,
-        dense: RetrieverCosine | RetrieverFAISS,
+        dense: RetrieverCosine | RetrieverFAISS | RetrieverQdrant,
         bm25: RetrieverBM25,
         fusion: str = "rrf",
         alpha: float = 0.5,
@@ -32,6 +33,7 @@ class RetrieverHybrid:
         self,
         query: str,
         top_k: int = BASE.top_k,
+        source: str | list[str] | None = None,
         *,
         fusion: str | None = None,
         alpha: float | None = None,
@@ -40,13 +42,14 @@ class RetrieverHybrid:
 
         The same query string feeds both arms: the dense sub-retriever embeds it, BM25
         tokenizes it. fusion/alpha override the instance defaults for this call (they are
-        per-query knobs, not baked into the index).
+        per-query knobs, not baked into the index). An optional source filter is forwarded
+        into both arms so each pool is filtered before fusion.
         """
         fusion = fusion if fusion is not None else self.fusion
         alpha = alpha if alpha is not None else self.alpha
         pool = top_k * 3
-        dense_results = self.dense.retrieve(query, top_k=pool)
-        bm25_results = self.bm25.retrieve(query, top_k=pool)
+        dense_results = self.dense.retrieve(query, top_k=pool, source=source)
+        bm25_results = self.bm25.retrieve(query, top_k=pool, source=source)
         if fusion == "rrf":
             return self._fuse_rrf(dense_results, bm25_results, top_k)
         return self._fuse_weighted(dense_results, bm25_results, top_k, alpha)
@@ -127,6 +130,8 @@ def build_hybrid_retriever(
     """Build a hybrid retriever combining a dense backend and BM25."""
     if store == "faiss":
         dense = build_faiss_retriever(data_path, embedder, index_type=index_type, chunk_max_tokens=chunk_max_tokens)
+    elif store == "qdrant":
+        dense = build_qdrant_retriever(data_path, embedder, chunk_max_tokens=chunk_max_tokens)
     else:
         dense = build_cosine_retriever(data_path, embedder, chunk_max_tokens=chunk_max_tokens)
     bm25 = build_bm25_retriever(data_path, chunk_max_tokens=chunk_max_tokens)

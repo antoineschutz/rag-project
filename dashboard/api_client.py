@@ -61,6 +61,11 @@ def get_presets() -> dict[str, dict[str, Any]]:
     return _request("GET", "/presets")
 
 
+def get_sources() -> list[str]:
+    """Return the available document sources (filenames) from /sources."""
+    return _request("GET", "/sources")
+
+
 def post_query(
     query: str, config: str | dict[str, Any] | None,
     history: list[dict[str, str]] | None = None,

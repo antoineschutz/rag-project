@@ -33,10 +33,13 @@ def render_standalone_query(standalone: str | None, original: str) -> None:
         st.write(standalone)
 
 
-def config_selector(presets: dict[str, Any], key: str = "cfg") -> str | dict[str, Any]:
+def config_selector(
+    presets: dict[str, Any], sources: list[str] | None = None, key: str = "cfg"
+) -> str | dict[str, Any]:
     """Render the Preset/Advanced config picker; return a preset name or an inline knob dict.
 
     `key` namespaces the widgets so different pages can render the picker independently.
+    `sources` populates the optional source filter (from GET /sources).
     """
     mode = st.radio("Configuration", ["Preset", "Advanced"], horizontal=True, key=f"{key}_mode")
     if mode == "Preset":
@@ -53,11 +56,15 @@ def config_selector(presets: dict[str, Any], key: str = "cfg") -> str | dict[str
     # The retrieval knobs (and HyDE) are greyed when no_rag is on; they have no effect without retrieval.
     no_rag = st.checkbox("no_rag (skip retrieval)", key=f"{key}_no_rag")
     retriever = st.selectbox("retriever", ["dense", "bm25", "hybrid"], disabled=no_rag, key=f"{key}_retriever")
+    store = st.selectbox("store (dense backend)", ["numpy", "faiss", "qdrant"], disabled=no_rag, key=f"{key}_store")
     top_k = st.slider("top_k", min_value=1, max_value=50, value=15, disabled=no_rag, key=f"{key}_top_k")
     rerank = st.checkbox("rerank (cross-encoder)", disabled=no_rag, key=f"{key}_rerank")
     hyde = st.checkbox("hyde (embed a hypothetical answer)", disabled=no_rag, key=f"{key}_hyde")
+    selected_sources = st.multiselect("Filter by source", sources or [], disabled=no_rag, key=f"{key}_sources")
 
     config: dict[str, Any] = {"no_rag": no_rag, "backend": backend}
     if not no_rag:
-        config.update({"retriever": retriever, "top_k": top_k, "rerank": rerank, "hyde": hyde})
+        config.update({"retriever": retriever, "store": store, "top_k": top_k, "rerank": rerank, "hyde": hyde})
+        if selected_sources:
+            config["source"] = selected_sources
     return config

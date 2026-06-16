@@ -11,7 +11,7 @@ Data flows linearly through five stages:
 1. **Ingestion**: layout-aware extraction with `pdfplumber` (multi-column reading order; tables, including borderless/booktabs tables, rendered as Markdown), plus Markdown, text, and DOCX, from `./data/`
 2. **Chunking**: sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens / 50-token overlap. Tables are kept atomic (never split mid-row) and bundled with surrounding prose when they fit
 3. **Embedding**: `sentence-transformers`, model swappable via `--embed-model` (`all-MiniLM-L6-v2` default; `bge-*`, `e5-*` supported)
-4. **Retrieval**: dense cosine (numpy or FAISS), BM25 lexical, or hybrid fusion. Optional cross-encoder re-ranking and HyDE query expansion on top
+4. **Retrieval**: dense (numpy cosine, FAISS, or Qdrant), BM25 lexical, or hybrid fusion. Optional cross-encoder re-ranking and HyDE query expansion on top, plus an optional source filter to restrict retrieval to chosen documents
 5. **Generation**: Ollama (local) or OpenAI, with a configurable context window (`num_ctx`)
 
 ## Setup
@@ -65,6 +65,14 @@ python main.py --query "..." --num-ctx 8192
 python main.py --query "..." --store faiss
 python main.py --query "..." --store faiss --index-type ivf
 
+# Qdrant store: in-process by default (rebuilt from the embedding cache). Set QDRANT_URL to
+# use a persistent server, which reuses an existing collection instead of re-upserting.
+python main.py --query "..." --store qdrant
+QDRANT_URL=http://localhost:6333 python main.py --query "..." --store qdrant
+
+# Restrict retrieval to specific documents (source filter; works with any store/retriever)
+python main.py --query "..." --source rag_lewis2020.pdf realm_guu2020.pdf
+
 # Swap the embedding model
 python main.py --query "..." --embed-model BAAI/bge-small-en-v1.5
 
@@ -88,7 +96,8 @@ Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup t
 |----------|---------|
 | `GET /health` | liveness check |
 | `GET /presets` | list the named presets (`baseline`, `best`, `no-rag`) and their configs |
-| `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides, or omit `config` for the best preset |
+| `GET /sources` | list the document filenames in the data dir, for the source filter |
+| `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides (including `store` and `source`), or omit `config` for the best preset |
 | `POST /evaluate` | score a config over the keyword-graded QA set (`accuracy_29`, optional LLM judge). A known preset `name` wins; pass an inline `config` under a non-preset name to score a custom config |
 | `POST /compare` | run one query through two configs and return both answers and chunks side by side |
 

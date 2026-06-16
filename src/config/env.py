@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
@@ -25,6 +26,9 @@ class RAGEnvConfig:
     # Presets the API warms at startup (loads models + builds indexes) so the first request
     # is not cold. Set to () to disable (e.g. for fast dev / uvicorn --reload startup).
     WARMUP_PRESETS: tuple[str, ...] = ("baseline", "best")
+    # When set, the qdrant store connects to this Qdrant server (and reuses an existing
+    # collection instead of re-upserting); when None, qdrant runs in-process (":memory:").
+    QDRANT_URL: str | None = field(default_factory=lambda: os.getenv("QDRANT_URL"))
 
 
 env = RAGEnvConfig()

@@ -8,6 +8,7 @@ from src.config import BASE
 from src.embeddings.embed import Embedder
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
+from src.retrieval._filter import filter_by_source, normalize_sources
 from src.store.sqlite_store import ChunkStore
 from src.utils.cache import cache_paths
 
@@ -58,19 +59,35 @@ class RetrieverFAISS:
         obj.embedder = embedder
         return obj
 
-    def retrieve(self, query: str, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = BASE.top_k,
+        source: str | list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Embed the query string and return the top_k most similar chunks."""
         if self.embedder is None:
             raise ValueError("RetrieverFAISS.retrieve needs an embedder; pass one to build, or call _retrieve_vec with a vector.")
-        return self._retrieve_vec(self.embedder.embed_query(query), top_k=top_k)
+        return self._retrieve_vec(self.embedder.embed_query(query), top_k=top_k, source=source)
 
-    def _retrieve_vec(self, query_embedding: np.ndarray, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
-        """Return the top_k chunks most similar to query_embedding using the FAISS index."""
+    def _retrieve_vec(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = BASE.top_k,
+        source: str | list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return the top_k chunks most similar to query_embedding using the FAISS index.
+
+        FAISS has no payload filter, so when a source filter is set the search widens to the
+        whole index and non-matching sources are dropped afterward (the awkward-without-Qdrant
+        path); top_k is applied after filtering.
+        """
         query = np.array(query_embedding, dtype="float32")
         if query.ndim == 1:
             query = query.reshape(1, -1)
         faiss.normalize_L2(query)
-        scores, indices = self.index.search(query, top_k)
+        search_k = self.index.ntotal if normalize_sources(source) is not None else top_k
+        scores, indices = self.index.search(query, search_k)
 
         results = []
         for score, idx in zip(scores[0], indices[0]):
@@ -83,7 +100,7 @@ class RetrieverFAISS:
             })
             logger.debug("%.4f | [%s] %s", score, self.docs[idx]["source"], self.docs[idx]["text"])
 
-        return results
+        return filter_by_source(results, source)[:top_k]
 
 
 def build_faiss_retriever(

@@ -26,20 +26,20 @@ class _Retriever:
         self.results = results or [{"text": "ctx-a", "source": "a", "score": 0.9}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k):
-        self.calls.append({"query": query, "top_k": top_k})
+    def retrieve(self, query, top_k, source=None):
+        self.calls.append({"query": query, "top_k": top_k, "source": source})
         return self.results
 
 
 class _Hybrid(RetrieverHybrid):
-    """Passes the isinstance(..., RetrieverHybrid) check; records fusion/alpha."""
+    """Passes the isinstance(..., RetrieverHybrid) check; records fusion/alpha/source."""
 
     def __init__(self):
         self.results = [{"text": "ctx-h", "source": "h", "score": 1.0}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k, *, fusion=None, alpha=None):
-        self.calls.append({"query": query, "top_k": top_k, "fusion": fusion, "alpha": alpha})
+    def retrieve(self, query, top_k, source=None, *, fusion=None, alpha=None):
+        self.calls.append({"query": query, "top_k": top_k, "source": source, "fusion": fusion, "alpha": alpha})
         return self.results
 
 
@@ -86,6 +86,18 @@ def test_hybrid_receives_fusion_and_alpha(prompts):
     answer_query(h, RetrievalParams(query="q", fusion="weighted", alpha=0.7), GenerationParams())
     assert h.calls[0]["fusion"] == "weighted"
     assert h.calls[0]["alpha"] == 0.7
+
+
+def test_source_forwarded_to_retriever(prompts):
+    ret = _Retriever()
+    answer_query(ret, RetrievalParams(query="q", source=["a.pdf"]), GenerationParams())
+    assert ret.calls[0]["source"] == ["a.pdf"]
+
+
+def test_source_forwarded_to_hybrid(prompts):
+    h = _Hybrid()
+    answer_query(h, RetrievalParams(query="q", source="a.pdf"), GenerationParams())
+    assert h.calls[0]["source"] == "a.pdf"
 
 
 def test_hyde_replaces_retrieval_text(prompts):

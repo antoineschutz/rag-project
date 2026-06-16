@@ -3,8 +3,9 @@
 Run with:
     uvicorn src.api.server:app --reload
 
-Endpoints: /health, /query (answer + retrieved chunks),
-/evaluate (score a config over the QA set), /compare (one query across two configs).
+Endpoints: /health, /presets, /sources (document filenames for the source filter),
+/query (answer + retrieved chunks), /evaluate (score a config over the QA set),
+/compare (one query across two configs).
 """
 
 import json
@@ -116,6 +117,19 @@ def health() -> dict[str, str]:
 def presets() -> dict[str, dict[str, Any]]:
     """List the named presets (name -> config) so a client can offer them as choices."""
     return {name: as_config_dict(pc) for name, pc in PRESETS.items()}
+
+
+@app.get("/sources")
+def sources() -> list[str]:
+    """List the document sources (filenames) in the data dir, for the source filter."""
+    from pathlib import Path
+    data_dir = Path(env.DATA_PATH)
+    names = {
+        p.name
+        for ext in ("*.pdf", "*.md", "*.txt", "*.docx")
+        for p in data_dir.glob(ext)
+    }
+    return sorted(names)
 
 
 def _query_config(req: QueryRequest) -> dict[str, Any]:

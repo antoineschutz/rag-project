@@ -19,6 +19,7 @@ def stub_builders(monkeypatch):
     monkeypatch.setattr(factory, "build_cosine_retriever", maker("cosine"))
     monkeypatch.setattr(factory, "build_faiss_retriever", maker("faiss"))
     monkeypatch.setattr(factory, "build_hybrid_retriever", maker("hybrid"))
+    monkeypatch.setattr(factory, "build_qdrant_retriever", maker("qdrant"))
     monkeypatch.setattr(factory, "Embedder", lambda model_name=None: f"embedder:{model_name}")
     return calls
 
@@ -36,8 +37,18 @@ def test_dense_faiss_dispatch(stub_builders):
     assert factory.build_index(IndexParams(retriever="dense", store="faiss")) == "faiss-retriever"
 
 
+def test_dense_qdrant_dispatch(stub_builders):
+    assert factory.build_index(IndexParams(retriever="dense", store="qdrant")) == "qdrant-retriever"
+
+
 def test_hybrid_dispatch(stub_builders):
     assert factory.build_index(IndexParams(retriever="hybrid")) == "hybrid-retriever"
+
+
+def test_hybrid_forwards_store(stub_builders):
+    factory.build_index(IndexParams(retriever="hybrid", store="qdrant"))
+    args, _ = stub_builders["hybrid"]
+    assert "qdrant" in args  # store is forwarded into the hybrid builder's dense arm
 
 
 def test_creates_embedder_when_none_passed(stub_builders):

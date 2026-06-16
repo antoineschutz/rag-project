@@ -72,3 +72,13 @@ def test_faiss_retrieve_top_k(faiss_retriever):
 def test_faiss_retrieve_best_match(faiss_retriever):
     results = faiss_retriever._retrieve_vec(QUERY[0], top_k=1)
     assert results[0]["text"] == "about birds"
+
+
+def test_cosine_source_filter_masks(retriever):
+    results = retriever._retrieve_vec(QUERY, top_k=5, source=["a.pdf", "b.pdf"])
+    assert {r["source"] for r in results} == {"a.pdf", "b.pdf"}
+
+
+def test_faiss_source_filter_masks(faiss_retriever):
+    results = faiss_retriever._retrieve_vec(QUERY[0], top_k=5, source="c.pdf")
+    assert {r["source"] for r in results} == {"c.pdf"}

@@ -10,7 +10,7 @@ revealed again on later reruns, not just in the run that produced them.
 
 import streamlit as st
 
-from api_client import APIError, get_presets, post_query_stream
+from api_client import APIError, get_presets, get_sources, post_query_stream
 from ui import config_selector, render_chunks, render_hyde_doc, render_standalone_query
 
 st.title("Chat")
@@ -18,13 +18,14 @@ st.write("Multi-turn chat. Follow-up questions are rewritten into a standalone q
 
 try:
     presets = get_presets()
+    sources = get_sources()
 except APIError as exc:
     st.error(str(exc))
     st.stop()
 
 with st.sidebar:
     st.header("Configuration")
-    config = config_selector(presets, key="chat")
+    config = config_selector(presets, sources=sources, key="chat")
     st.caption("Config applies per turn; you can change it mid-conversation.")
     if st.button("Clear conversation"):
         for stale in [k for k in st.session_state if k.startswith("sources_")]:

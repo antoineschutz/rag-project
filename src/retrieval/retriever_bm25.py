@@ -7,6 +7,7 @@ from rank_bm25 import BM25Okapi
 from src.config import BASE
 from src.ingestion.loader import load_documents
 from src.chunking.chunk import chunk_documents
+from src.retrieval._filter import filter_by_source, normalize_sources
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +22,31 @@ class RetrieverBM25:
         self.bm25 = BM25Okapi(tokenized)
         logger.info("BM25 index built over %d chunks.", len(chunked_docs))
 
-    def retrieve(self, query: str, top_k: int = BASE.top_k) -> list[dict[str, Any]]:
-        """Return top_k chunks ranked by BM25 score for the given query string."""
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = BASE.top_k,
+        source: str | list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return top_k chunks ranked by BM25 score for the given query string.
+
+        With a source filter, the full ranking is computed then non-matching sources are
+        dropped before taking top_k.
+        """
         tokens = query.lower().split()
         scores = self.bm25.get_scores(tokens)
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        return [
+        ranked = np.argsort(scores)[::-1]
+        if normalize_sources(source) is None:
+            ranked = ranked[:top_k]
+        results = [
             {
                 "text": self.chunked_docs[i]["text"],
                 "source": self.chunked_docs[i]["source"],
                 "score": float(scores[i]),
             }
-            for i in top_indices
+            for i in ranked
         ]
+        return filter_by_source(results, source)[:top_k]
 
 
 def build_bm25_retriever(
