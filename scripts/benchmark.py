@@ -29,7 +29,8 @@ def _print_report(report: dict[str, Any], verbose: bool = False) -> None:
     When verbose, also print the question, expected answer, matched keywords,
     and the model's full answer for each question.
     """
-    print(f"\n=== benchmark: {report['config_name']} ===")
+    src_tag = " +src" if report.get("use_source") else ""
+    print(f"\n=== benchmark: {report['config_name']}{src_tag} ===")
     for r in report["results"]:
         mark = "✓" if r["correct"] else "✗"
         judged = r.get("judge")
@@ -73,9 +74,11 @@ def main() -> None:
                         help="Bypass the answer cache and regenerate every answer; required for a real latency measurement")
     parser.add_argument("--judge", action="store_true",
                         help=f"Also grade each answer with an independent judge LLM ({JUDGE_MODEL}); needs OPENAI_API_KEY and makes ~29 API calls")
+    parser.add_argument("--use-source", action="store_true", dest="use_source",
+                        help="Filter retrieval to each question's labeled source (oracle source-filter experiment)")
     args = parser.parse_args()
 
-    report = run_benchmark(args.config, CONFIGS[args.config], fresh=args.fresh, judge=args.judge)
+    report = run_benchmark(args.config, CONFIGS[args.config], fresh=args.fresh, judge=args.judge, use_source=args.use_source)
     _print_report(report, verbose=args.verbose)
     if not args.no_mlflow:
         log_to_mlflow(report)

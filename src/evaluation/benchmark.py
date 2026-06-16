@@ -37,7 +37,8 @@ def _on_event(event: str, qa: dict[str, Any], index_params: IndexParams | None) 
 
 
 def run_benchmark(
-    config_name: str, cfg: PipelineConfig | dict[str, Any], fresh: bool = False, judge: bool = False
+    config_name: str, cfg: PipelineConfig | dict[str, Any], fresh: bool = False,
+    judge: bool = False, use_source: bool = False,
 ) -> dict[str, Any]:
     """Run one config over the keyword-scored questions and return results + accuracy_29.
 
@@ -48,6 +49,9 @@ def run_benchmark(
     If `judge` is set, an independent API model (not the local LLM) also grades each
     answer against the reference; `score_judge` and the keyword/judge disagreement
     count are returned alongside the keyword `accuracy_29`.
+
+    If `use_source` is set, each question is retrieved with its labeled source as a filter
+    (the oracle source-filter experiment); these answers cache separately from the unfiltered run.
     """
     cfg = as_config_dict(cfg)  # accept a PipelineConfig (preset) or an inline dict
     scored = [qa for qa in QA_PAIRS if qa["keywords"]]
@@ -55,7 +59,7 @@ def run_benchmark(
     judge_client = LLMClient(backend=JUDGE_BACKEND, model=JUDGE_MODEL) if judge else None
 
     t0 = time.time()
-    answers = answer_for_config(scored, cfg, cache, fresh=fresh, on_event=_on_event)
+    answers = answer_for_config(scored, cfg, cache, fresh=fresh, use_source=use_source, on_event=_on_event)
 
     results: list[dict[str, Any]] = []
     correct = 0
@@ -88,6 +92,7 @@ def run_benchmark(
         "correct": correct,
         "accuracy_29": accuracy,
         "fresh": fresh,
+        "use_source": use_source,
         "latency_s": (time.time() - t0) if fresh else None,
         "judge": judge,
         "score_judge": (judge_correct / len(scored)) if (judge and scored) else None,
@@ -98,9 +103,11 @@ def run_benchmark(
 def log_to_mlflow(report: dict[str, Any]) -> None:
     """Log one benchmark run to MLflow: config as params, scores as metrics, full results as an artifact."""
     mlflow.set_experiment(EXPERIMENT_NAME)
-    with mlflow.start_run(run_name=report["config_name"]):
+    run_name = report["config_name"] + ("+src" if report.get("use_source") else "")
+    with mlflow.start_run(run_name=run_name):
         mlflow.log_param("config_name", report["config_name"])
         mlflow.log_param("fresh", report["fresh"])
+        mlflow.log_param("use_source", report.get("use_source", False))
         mlflow.log_param("judge", report["judge"])
         if report["judge"]:
             mlflow.log_param("judge_model", JUDGE_MODEL)
