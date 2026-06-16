@@ -56,9 +56,14 @@ def health() -> bool:
         return False
 
 
+# The dashboard exposes a curated subset of the server's presets (the rest are eval-only).
+DASHBOARD_PRESETS = ("baseline", "best", "gpt", "llama3.1-8b")
+
+
 def get_presets() -> dict[str, dict[str, Any]]:
-    """Return the named presets (name -> flat config dict) from /presets."""
-    return _request("GET", "/presets")
+    """Return the dashboard's curated presets (name -> flat config dict) from /presets."""
+    all_presets = _request("GET", "/presets")
+    return {name: all_presets[name] for name in DASHBOARD_PRESETS if name in all_presets}
 
 
 def get_sources() -> list[str]:

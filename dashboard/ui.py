@@ -49,9 +49,11 @@ def config_selector(
             index=names.index("best") if "best" in names else 0, key=f"{key}_preset",
         )
 
-    backend = st.selectbox("backend", ["ollama", "gpt"], key=f"{key}_backend")
+    backend = st.selectbox("backend", ["ollama", "gpt", "groq"], key=f"{key}_backend")
     if backend == "gpt":
         st.caption("gpt needs OPENAI_API_KEY set on the server.")
+    elif backend == "groq":
+        st.caption("groq needs GROQ_API_KEY set on the server (serves llama-3.1-8b).")
 
     # The retrieval knobs (and HyDE) are greyed when no_rag is on; they have no effect without retrieval.
     no_rag = st.checkbox("no_rag (skip retrieval)", key=f"{key}_no_rag")

@@ -30,7 +30,8 @@ st.subheader("Pages")
 st.markdown(
     "- **Query**: ask one question and see the answer plus the retrieved chunks.\n"
     "- **Compare**: run one question through two configs (e.g. RAG vs no-RAG) side by side.\n"
-    "- **Evaluate**: chart benchmark results, or run a live evaluation over the QA set."
+    "- **Evaluate**: chart benchmark results, or run a live evaluation over the QA set.\n"
+    "- **Chat**: hold a multi-turn conversation; follow-up questions are rewritten into a standalone query before retrieval."
 )
 
 st.divider()

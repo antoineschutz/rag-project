@@ -25,7 +25,7 @@ class QueryConfig(BaseModel):
     hyde: bool | None = Field(None, description="Embed a hypothetical answer passage instead of the raw query.")
     store: str | None = Field(None, description="Dense backend store: numpy, faiss, or qdrant.")
     source: str | list[str] | None = Field(None, description="Restrict retrieval to these document sources (filenames); None uses all sources.")
-    backend: str | None = Field(None, description="LLM backend: ollama or gpt; None uses the config default.")
+    backend: str | None = Field(None, description="LLM backend: ollama, gpt, or groq; None uses the config default.")
     model: str | None = Field(None, description="LLM model name override.")
 
 

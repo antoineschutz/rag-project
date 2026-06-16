@@ -19,7 +19,7 @@ col_a, col_b = st.columns(2)
 with col_a:
     a = st.selectbox("Config A", names, index=names.index("baseline") if "baseline" in names else 0)
 with col_b:
-    b = st.selectbox("Config B", names, index=names.index("no-rag") if "no-rag" in names else 0)
+    b = st.selectbox("Config B", names, index=names.index("best") if "best" in names else 0)
 
 query = st.text_area("Question", placeholder="What is salient span masking?")
 
