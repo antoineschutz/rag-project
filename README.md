@@ -1,6 +1,8 @@
-# RAG Pipeline
+# RAG Pipeline for Scientific Papers
 
 A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
+
+The pipeline is tuned for scientific and research PDFs (the working corpus is ML papers). The ingestion heuristics in particular target academic layouts: two-column reflow, booktabs and borderless numeric results tables, "Table N" captions, and scientific-notation repair. Plain prose, Markdown, text, and DOCX are handled generically, but other document types (invoices, contracts, brochures) will extract as readable text without the specialized table reconstruction and fact verbalization.
 
 ## Architecture
 
@@ -110,19 +112,18 @@ Set `RAG_API_URL` if the API runs somewhere other than `http://127.0.0.1:8000`.
 
 ## Results
 
-Benchmarked on 32 hand-written Q/A pairs (8 difficulty levels) over a corpus of real ML papers plus a few synthetic docs (`phi3`, local). Two qualitative sweep rounds, then a scored benchmark tracked in MLflow:
-
-- **`eval_results/` (round 1)** exposed a table-extraction bug: borderless / booktabs tables weren't parsed, so every table-lookup question failed. Fixed in ingestion and chunking.
-- **`eval_results2/` (round 2, 7 dimensions, post-fix)** showed the real ceiling is phi3's context window, not retrieval. At `top_k ≥ 40` or chunks ≥ 256 the prompt overflows the 4096 default and the model returns truncated gibberish.
-
-`scripts/benchmark.py` scores every answer two ways: an exact-match keyword check (`accuracy_29`) and an independent LLM-as-judge (`gpt-4o-mini`, not the model under test). Retrieval helps, and tuning helps more:
+Benchmarked on 29 hand-written Q/A pairs (8 difficulty levels) over a corpus of real ML papers plus a few synthetic docs. `scripts/benchmark.py` scores every answer two ways: an exact-match keyword check (`accuracy_29`) and an LLM-as-judge (`gpt-4o-mini`). The goal is lifting a small local model (`phi3`) with retrieval; the hosted models (OpenAI, Groq) are ceiling probes.
 
 | config | exact match | LLM judge |
 |--------|-------------|-----------|
-| no-RAG (phi3 alone) | 5/29 (17%) | 4/29 (14%) |
-| default RAG (dense, MiniLM, k=15) | 14/29 (48%) | 13/29 (45%) |
-| best (hybrid+RRF, rerank, bge-small, k=20) | 17/29 (59%) | 14/29 (48%) |
+| phi3, no-RAG | 5/29 (17%) | 3/29 (10%) |
+| phi3, baseline RAG (dense MiniLM, k=15) | 17/29 (59%) | 14/29 (48%) |
+| phi3, best RAG (hybrid+RRF, rerank, bge-small, k=20) | 19/29 (66%) | 15/29 (52%) |
+| GPT-4o-mini, no-RAG | 8/29 (28%) | 8/29 (28%) |
+| GPT-4o-mini, RAG | 27/29 (93%) | 24/29 (83%) |
+| Llama-3.1-8B, no-RAG | 5/29 (17%) | 4/29 (14%) |
+| Llama-3.1-8B, RAG | 27/29 (93%) | 25/29 (86%) |
 
-The judge is stricter and narrows the gap (it catches keyword false positives), but agrees on the ranking. Cross-document synthesis and deep-table lookups stay unsolved by single-shot retrieval.
+Retrieval does the heavy lifting: RAG takes phi3 from 10% to 52% on the judge, and even the hosted models gain roughly 55 points with retrieval (they cannot answer this corpus from parametric knowledge alone). The judge is stricter than the keyword check (it catches substring false positives) but agrees on the ranking. The `gpt` preset and the judge are both gpt-4o-mini, so that row is self-graded.
 
-Full per-question breakdown: [`eval_results2/summary.md`](eval_results2/summary.md). Reproduce: `python scripts/benchmark.py --config best --judge`, then `mlflow ui` to browse runs.
+Reproduce: `python scripts/benchmark.py --config best --judge`, then `mlflow ui` to browse runs.
