@@ -6,6 +6,7 @@ are stubbed so only the streaming wiring (generators and NDJSON framing) is exer
 
 import json
 import types
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -48,10 +49,12 @@ def test_generate_stream_skips_empty_deltas(monkeypatch):
 class _Retriever:
     """Minimal non-hybrid retriever returning a fixed result."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.results = [{"text": "ctx-a", "source": "a", "score": 0.9}]
 
-    def retrieve(self, query, top_k, source=None):
+    def retrieve(
+        self, query: str, top_k: int, source: str | list[str] | None = None
+    ) -> list[dict[str, Any]]:
         return self.results
 
 

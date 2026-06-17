@@ -84,7 +84,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s — %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s | %(message)s")
     for name in ("__main__", "src"):
         logging.getLogger(name).setLevel(args.log_level)
 

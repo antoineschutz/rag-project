@@ -8,8 +8,8 @@ Three dataclasses capture the full knob set, grouped by when they matter:
 - RetrievalParams: per-query knobs applied against an already-built index.
 - GenerationParams: LLM knobs for the answer step.
 
-These are the single source of truth the CLI (argparse), the API (QueryRequest), and
-the PRESETS map onto. `from_dict` builds a group from a flat kwargs dict, ignoring keys
+The CLI (argparse), the API (QueryRequest), and the PRESETS map onto these groups.
+`from_dict` builds a group from a flat kwargs dict, ignoring keys
 that belong to the other groups, so one flat config can feed all three. Defaults are drawn
 from BASE / env so there is one place to change them.
 """

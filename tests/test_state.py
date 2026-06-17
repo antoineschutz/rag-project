@@ -20,7 +20,7 @@ def test_get_embedder_memoizes_per_model(monkeypatch):
     built = []
 
     class FakeEmbedder:
-        def __init__(self, model_name):
+        def __init__(self, model_name: str) -> None:
             built.append(model_name)
             self.model_name = model_name
 

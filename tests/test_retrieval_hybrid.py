@@ -81,7 +81,7 @@ def test_rrf_result_keys(hybrid_rrf: RetrieverHybrid) -> None:
 
 def test_rrf_boosts_overlap(dense: RetrieverCosine, bm25: RetrieverBM25) -> None:
     # c.txt ranks #1 in dense (QUERY_EMBEDDING matches it exactly) and top-2 in BM25
-    # for the query "neural network gradient descent" — it should win the fused ranking
+    # for the query "neural network gradient descent", it should win the fused ranking
     retriever = RetrieverHybrid(dense, bm25, fusion="rrf")
     results = retriever.retrieve("neural network gradient descent", top_k=5)
     assert results[0]["source"] == "c.txt"

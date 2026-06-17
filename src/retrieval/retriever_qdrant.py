@@ -42,6 +42,8 @@ class RetrieverQdrant:
         self.collection = collection
         self.client = client or QdrantClient(":memory:")
         dim = doc_embeddings.shape[1]
+        if self.client.collection_exists(collection):
+            self.client.delete_collection(collection)
         self.client.create_collection(
             collection, vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
         )

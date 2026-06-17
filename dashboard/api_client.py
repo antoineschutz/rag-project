@@ -71,20 +71,6 @@ def get_sources() -> list[str]:
     return _request("GET", "/sources")
 
 
-def post_query(
-    query: str, config: str | dict[str, Any] | None,
-    history: list[dict[str, str]] | None = None,
-) -> dict[str, Any]:
-    """Run one query. `config` is a preset name, inline knob dict, or None (best preset).
-
-    `history` is the prior chat turns (each {role, content}) for multi-turn; omit for single-shot.
-    """
-    return _request(
-        "POST", "/query",
-        json={"query": query, "config": config, "history": history}, timeout=QUERY_TIMEOUT,
-    )
-
-
 def post_query_stream(
     query: str, config: str | dict[str, Any] | None,
     history: list[dict[str, str]] | None = None,

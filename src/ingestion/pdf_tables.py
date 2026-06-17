@@ -20,11 +20,10 @@ from src.ingestion.table_verbalize import (
 
 
 def _is_plausible_table(rows: list[list]) -> bool:
-    """Return True if an extracted table looks like real tabular data and not mis-detected body text.
+    """True if an extracted table looks like real tabular data, not mis-detected body text.
 
-    Requires at least 3 rows, at least 3 columns, and an average cell length under 80 chars.
-    Average (not max) is used because merged cells in booktabs tables can be long,
-    but the overall average still stays well below prose sentence lengths.
+    Average (not max) cell length is checked: merged booktabs cells can be long while the
+    average stays well below prose.
     """
     if len(rows) < 3 or not rows[0] or len(rows[0]) < 3:
         return False
@@ -37,9 +36,8 @@ def _is_plausible_table(rows: list[list]) -> bool:
 def _find_booktabs_tables(page: pdfplumber.pdf.Page) -> list:
     """Detect LaTeX booktabs-style tables that have only horizontal rules and no vertical lines.
 
-    Groups horizontal rules that span >= 55% of page width into table regions,
-    then builds explicit vertical column boundaries from data-row word x0 clustering
-    (spanning header rows above the first midrule are excluded from column detection).
+    Wide horizontal rules (>= 55% of page width) mark table regions; vertical column boundaries
+    come from data-row word x0 clustering.
     """
     page_width = page.width
     wide_rules = sorted(
@@ -74,8 +72,7 @@ def _find_booktabs_tables(page: pdfplumber.pdf.Page) -> list:
         if not words_in_region:
             continue
 
-        # Exclude spanning header rows (above the first midrule) from column detection
-        # so multi-column headers don't corrupt the column boundary inference.
+        # Exclude spanning header rows (above the first midrule) so they don't corrupt column inference.
         data_top = group[1]["top"] if len(group) > 1 else group[0]["top"]
         data_words = [w for w in words_in_region if w["top"] > data_top]
         col_words = data_words if data_words else words_in_region
@@ -116,8 +113,8 @@ def _find_tables(page: pdfplumber.pdf.Page) -> list:
 def _header_alignment_score(band: list[list[dict]], header: list[dict]) -> float:
     """Fraction of band cells that fall as single clean numbers under the header's column anchors.
 
-    A real column-label row makes the numbers below it line up into clean one-number cells; a
-    prose line used as a header scatters them, scoring low. Used to pick the header row.
+    Used to pick the header row: a real label row makes numbers line up into clean cells; a
+    prose line scatters them and scores low.
     """
     anchors = [(w["x0"] + w["x1"]) / 2 for w in header]
     if not anchors:
@@ -191,8 +188,8 @@ def _emit_band_table(
                  "below", "each", "shown", "by", "as", "we", "our", "this", "that", "from"}
 
     def short_header(h: list[dict]) -> bool:
-        # Real column labels are short (NQ, WQ, QQP) and never function words; a caption or prose
-        # line picked as the header is longer and full of stopwords.
+        # Real column labels are short (NQ, WQ, QQP) and never function words; a caption picked
+        # as the header is longer and full of stopwords.
         if len(h) < 3 or (sum(len(w["text"]) for w in h) / len(h)) > 6:
             return False
         return not any(w["text"].lower() in stopwords for w in h)
@@ -218,11 +215,10 @@ def _emit_band_table(
 def _find_whitespace_tables(words: list[dict], caption: str = "") -> list[tuple[str, list[str], set[int]]]:
     """Detect borderless numeric tables (no ruling lines) from word alignment.
 
-    Academic results tables often have no rules, so pdfplumber's line-based detection misses them
-    and the cells flatten into prose. This finds a contiguous band of lines that each carry several
-    numbers, splits side-by-side panels, picks the short-token label row above whose tokens best
-    align to the numeric columns, rebuilds the grid, and trims prose rows that leaked in. Returns
-    (text, consumed_word_ids) per table so the caller can drop those words from the prose.
+    The line-based detector misses unruled academic tables. Finds a contiguous band of lines
+    each carrying several numbers, splits side-by-side panels, picks the best-aligned short-token
+    label row, rebuilds the grid, and trims leaked prose rows. The consumed word ids let the
+    caller drop those words from the prose.
     """
     by_top: dict[int, list[dict]] = {}
     for w in words:
@@ -272,10 +268,9 @@ def _find_whitespace_tables(words: list[dict], caption: str = "") -> list[tuple[
 
 
 def _extract_page_text(page: pdfplumber.pdf.Page) -> tuple[str, list[str]]:
-    """Extract one pdfplumber page. Returns (page_text, table_facts) where page_text holds the
-    Markdown tables and body prose in reading order, and table_facts is one verbalized sentence
-    per table row/column. The facts are returned separately so each can become its own chunk: a
-    focused fact like "BERT-LARGE: GLUE QQP 72.1" then matches an exact-term query on its own."""
+    """Extract one pdfplumber page. Returns (page_text, table_facts): page_text holds the Markdown
+    tables and body prose in reading order; table_facts is one verbalized sentence per table
+    row/column, returned separately so each can become its own chunk."""
     # A nearby "Table N:" line is used as a caption so verbalized rows carry the table's topic.
     page_caption_match = re.search(r"(Table\s+\d+[:.][^\n]{0,60})", page.extract_text() or "")
     caption = page_caption_match.group(1).strip() if page_caption_match else ""
@@ -329,7 +324,7 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> tuple[str, list[str]]:
             body_words_sorted = sorted(body_words, key=lambda w: (w["top"], w["x0"]))
             keyed_lines = _words_to_text(body_words_sorted)
 
-        # Phase 3: header labelling — match chars by y-position bucket, not text substring
+        # Phase 3: header labelling, match chars by y-position bucket not text substring
         non_table_chars = [
             c for c in page.chars
             if not any(_word_in_bbox(c, bb) for bb in table_bboxes)

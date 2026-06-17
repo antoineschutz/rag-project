@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from src.config import GenerationParams, RetrievalParams
@@ -22,11 +24,13 @@ def prompts(monkeypatch):
 class _Retriever:
     """Non-hybrid retriever that records its retrieve() calls."""
 
-    def __init__(self, results=None):
+    def __init__(self, results: list[dict[str, Any]] | None = None) -> None:
         self.results = results or [{"text": "ctx-a", "source": "a", "score": 0.9}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k, source=None):
+    def retrieve(
+        self, query: str, top_k: int, source: str | list[str] | None = None
+    ) -> list[dict[str, Any]]:
         self.calls.append({"query": query, "top_k": top_k, "source": source})
         return self.results
 
@@ -34,11 +38,14 @@ class _Retriever:
 class _Hybrid(RetrieverHybrid):
     """Passes the isinstance(..., RetrieverHybrid) check; records fusion/alpha/source."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.results = [{"text": "ctx-h", "source": "h", "score": 1.0}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k, source=None, *, fusion=None, alpha=None):
+    def retrieve(
+        self, query: str, top_k: int, source: str | list[str] | None = None,
+        *, fusion: str | None = None, alpha: float | None = None,
+    ) -> list[dict[str, Any]]:
         self.calls.append({"query": query, "top_k": top_k, "source": source, "fusion": fusion, "alpha": alpha})
         return self.results
 
@@ -67,10 +74,12 @@ def test_rerank_widens_pool_then_trims(prompts):
     ret = _Retriever(results=[{"text": f"c{i}", "source": "s", "score": 1.0} for i in range(30)])
 
     class FakeReranker:
-        def __init__(self):
-            self.called = None
+        def __init__(self) -> None:
+            self.called: tuple[str, int, int] | None = None
 
-        def rerank(self, query, results, top_k):
+        def rerank(
+            self, query: str, results: list[dict[str, Any]], top_k: int
+        ) -> list[dict[str, Any]]:
             self.called = (query, len(results), top_k)
             return results[:top_k]
 

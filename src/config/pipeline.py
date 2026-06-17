@@ -2,8 +2,8 @@
 named presets that build on it.
 
 A preset is just a complete PipelineConfig. BASE = PipelineConfig() is the default pipeline
-(it is the "baseline" preset) and the single source the param-group defaults (src/config/params.py)
-and the low-level function defaults (Embedder, chunking, retrieve) draw from. Fields are
+(it is the "baseline" preset); the param-group defaults (src/config/params.py) and the
+low-level function defaults (Embedder, chunking, retrieve) draw from it. Fields are
 lower_snake so asdict() yields the flat config dicts the pipeline consumes (IndexParams.from_dict
 etc.). `as_config_dict` flattens a PipelineConfig (or passes a dict through).
 """

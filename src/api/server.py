@@ -10,7 +10,7 @@ Endpoints: /health, /presets, /sources (document filenames for the source filter
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -18,7 +18,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.pipeline import answer_query, answer_query_stream
-from src.config import PRESETS, IndexParams, as_config_dict, env, split_config
+from src.config import (
+    PRESETS,
+    GenerationParams,
+    IndexParams,
+    RetrievalParams,
+    as_config_dict,
+    env,
+    split_config,
+)
+from src.reranker.reranker import Reranker
+from src.retrieval.factory import Retriever
 from src.api import state
 from src.api.schemas import (
     CompareRequest,
@@ -54,7 +64,7 @@ def _warmup() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Warm the configured presets before the server starts accepting requests."""
     _warmup()
     yield
@@ -68,13 +78,14 @@ app = FastAPI(
 )
 
 
-def _build_pipeline(query_text: str, cfg: dict[str, Any]):
+def _build_pipeline(
+    query_text: str, cfg: dict[str, Any]
+) -> tuple[Retriever | None, RetrievalParams, GenerationParams, Reranker | None]:
     """Resolve cfg into (retriever, rp, gp, reranker), reusing the memoized retriever/reranker.
 
     `cfg` is a (possibly sparse) flat config (a PRESETS entry or a QueryRequest dump). Dropping
     None lets each param group apply its own default. The retriever is fetched from the in-process
-    cache (built once, reused across requests); this is the two-phase interface, so no per-call
-    injection into the pipeline is needed.
+    cache (built once, reused across requests).
     """
     index_params, rp, gp = split_config(cfg, query_text)
     retriever = None if gp.no_rag else state.get_retriever(index_params)

@@ -47,7 +47,7 @@ def test_docx_chunk(docx_chunks):
 
 
 def test_pdf_prose_chunk(pdf_chunks):
-    # not tied to a specific Q/A pair — checks DPR bi-encoder section is reachable
+    # not tied to a specific Q/A pair: checks DPR bi-encoder section is reachable
     rag_chunks = [c for c in pdf_chunks if c["source"] == "rag_lewis2020.pdf"]
     assert _any_chunk_contains(rag_chunks, "document encoder", "query encoder")
 

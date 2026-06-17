@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class RetrieverBM25:
-    """BM25 lexical retriever — no embeddings, purely token-based."""
+    """BM25 lexical retriever: no embeddings, purely token-based."""
 
     def __init__(self, chunked_docs: list[dict[str, str]]) -> None:
         """Build BM25 index from tokenized chunk texts."""

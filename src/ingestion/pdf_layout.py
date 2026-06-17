@@ -12,11 +12,9 @@ def _word_in_bbox(word: dict, bbox: tuple) -> bool:
 
 
 def _words_to_text(words: list[dict]) -> list[tuple[int, str]]:
-    """Reconstruct paragraph text from word dicts; returns (top_bucket, line_text) pairs sorted by top position.
+    """Reconstruct (top_bucket, line_text) pairs from word dicts, sorted by top position.
 
-    Within each top bucket words are sorted by x0 so that superscripts and
-    descenders (which have slightly different top values) are placed in reading
-    order rather than the order they happen to be sorted by top.
+    Words within a bucket are sorted by x0 so superscripts/descenders land in reading order.
     """
     if not words:
         return []
@@ -31,13 +29,7 @@ def _words_to_text(words: list[dict]) -> list[tuple[int, str]]:
 
 
 def _find_column_split(words: list[dict], page_width: float) -> float | None:
-    """Find the x-coordinate of the gutter between two columns, or None if no clear gap exists.
-
-    Builds a histogram of word x-centre positions in 2-point bins across the
-    middle 30–70% of the page width, then locates the longest consecutive run
-    of near-empty bins that has non-empty bins on both sides (the actual gutter).
-    Returns the midpoint of that run, or None if no such gap is found.
-    """
+    """Find the x of the gutter between two columns, or None if no clear gap exists."""
     search_lo = page_width * 0.30
     search_hi = page_width * 0.70
     bin_width = 2.0
@@ -59,7 +51,7 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
     threshold = max_count * 0.10
     empty = [c <= threshold for c in counts]
 
-    # Find all runs of consecutive empty bins that are flanked by non-empty bins
+    # Longest run of empty bins flanked by non-empty bins on both sides
     best_run_len = 0
     best_run_mid = -1
     i = 0
@@ -68,7 +60,6 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
             j = i
             while j < n_bins and empty[j]:
                 j += 1
-            # Run is i..j-1; flanked on left (i>0 and not empty[i-1]) and right (j<n_bins and not empty[j])
             left_ok = i > 0 and not empty[i - 1]
             right_ok = j < n_bins and not empty[j]
             if left_ok and right_ok and (j - i) > best_run_len:
@@ -87,9 +78,7 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
 
     split_candidate = search_lo + best_run_mid * bin_width
 
-    # Reject splits that are too far from the horizontal centre of the word
-    # distribution.  A real two-column gutter sits near the midpoint; a
-    # spurious gap found inside a single-column text block can land anywhere.
+    # Reject splits far from the word distribution's centre (real gutters sit near the midpoint).
     x_centers = [(w["x0"] + w["x1"]) / 2 for w in words]
     x_min, x_max = min(x_centers), max(x_centers)
     text_half_width = (x_max - x_min) / 2
@@ -101,10 +90,9 @@ def _find_column_split(words: list[dict], page_width: float) -> float | None:
 
 
 def _find_footnote_top(page: pdfplumber.pdf.Page) -> float:
-    """Return the y-coordinate of the top of the footnote zone, or page.height if none detected.
+    """Return the y of the footnote zone top, or page.height if none.
 
-    Detects the horizontal separator rule that LaTeX draws between body and footnotes:
-    a short horizontal line in the bottom 40% of the page.
+    Detects the LaTeX body/footnote separator: a short horizontal rule in the bottom 40%.
     """
     separator_lines = [
         l for l in page.lines
@@ -118,11 +106,7 @@ def _find_footnote_top(page: pdfplumber.pdf.Page) -> float:
 
 
 def _column_boundaries_from_words(words: list[dict], page_width: float) -> list[float]:
-    """Infer column x-boundaries from word x0 positions using gap detection.
-
-    Uses x_tolerance=5 word groupings; treats gaps > 24 pt as column separators.
-    Returns a list of x boundary values suitable for explicit_vertical_lines.
-    """
+    """Infer column x-boundaries from word x0 positions, treating gaps > 24 pt as separators."""
     if not words:
         return []
     xs = sorted({round(w["x0"]) for w in words})
@@ -136,18 +120,16 @@ def _column_boundaries_from_words(words: list[dict], page_width: float) -> list[
     x_max = max(w["x1"] for w in words) + 5
     boundaries = [x_min]
     for i in range(len(col_starts) - 1):
-        # Boundary sits in the gap between current column's last x0 and next column's first x0
         boundaries.append((col_starts[i + 1] - 5))
     boundaries.append(x_max)
     return boundaries
 
 
 def _repair_notation(text: str) -> str:
-    """Rejoin scientific notation and subscripts that pdfplumber shatters into separate tokens.
+    """Rejoin scientific notation and subscripts that pdfplumber splits across tokens.
 
-    Superscript exponents and subscripts sit at a different vertical offset, so the extractor
-    splits e.g. "3.3 x 10^18" into "3.3·" and "1018" (often across table cells), and "d_ff" into
-    "d ... ff" around the value. Both are rejoined into a single readable token.
+    The differing vertical offset breaks "3.3 x 10^18" into "3.3·"/"1018" and "d_ff" into
+    "d ... ff"; both are rejoined.
     """
     # "3.3· | 1018" or "3.3 · 1018" -> "3.3·10^18"
     text = re.sub(r"(\d[\d.]*)\s*·\s*\|?\s*10(\d+)", r"\1·10^\2", text)

@@ -57,7 +57,7 @@ make up-ollama      # = docker compose -f docker-compose.yml -f docker-compose.b
 
 `make down` stops either stack (volumes are kept). The `make` targets are just shortcuts for the underlying `docker compose` commands shown in the comments.
 
-The first boot downloads the embedder/reranker (and, in bundled mode, pulls `phi3`); everything caches in named volumes, so later starts are fast. No API keys are needed for the `phi3` path; copy `.env.example` to `.env` and fill it in to use the `gpt` or `groq` presets.
+The first boot downloads the embedder/reranker (and, in bundled mode, pulls `phi3`); everything caches in named volumes, so later starts are fast. No API keys are needed for the `phi3` path; copy `.env.example` to `.env` and fill it in to use the `gpt` or `llama3.1-8b` presets.
 
 ## Usage
 
@@ -129,7 +129,7 @@ Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup t
 
 ## Dashboard
 
-A Streamlit dashboard (`dashboard/`) provides a browser UI over the API. It is presentation only: every page calls the FastAPI server, so the pipeline stays decoupled from the UI. Run both processes from the repo root:
+A Streamlit dashboard (`dashboard/`) provides a browser UI over the API: every page calls the FastAPI server. Run both processes from the repo root:
 
 ```bash
 uvicorn src.api.server:app --reload   # terminal 1: the API

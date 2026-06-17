@@ -6,6 +6,7 @@ not answer quality. Mirrors the fixtures in test_answer_query.py.
 """
 
 import json
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,11 +38,13 @@ def prompts(monkeypatch):
 class _Retriever:
     """Non-hybrid retriever that records the query it was asked to retrieve."""
 
-    def __init__(self, results=None):
+    def __init__(self, results: list[dict[str, Any]] | None = None) -> None:
         self.results = results or [{"text": "ctx-a", "source": "a", "score": 0.9}]
         self.calls: list[dict] = []
 
-    def retrieve(self, query, top_k, source=None):
+    def retrieve(
+        self, query: str, top_k: int, source: str | list[str] | None = None
+    ) -> list[dict[str, Any]]:
         self.calls.append({"query": query, "top_k": top_k, "source": source})
         return self.results
 
@@ -95,10 +98,12 @@ def test_rerank_uses_the_condensed_query(prompts):
     ret = _Retriever(results=[{"text": f"c{i}", "source": "s", "score": 1.0} for i in range(30)])
 
     class FakeReranker:
-        def __init__(self):
-            self.query = None
+        def __init__(self) -> None:
+            self.query: str | None = None
 
-        def rerank(self, query, results, top_k):
+        def rerank(
+            self, query: str, results: list[dict[str, Any]], top_k: int
+        ) -> list[dict[str, Any]]:
             self.query = query
             return results[:top_k]
 

@@ -52,18 +52,16 @@ def _fact_pair(label: str, value: str) -> str:
 def _verbalize_grid(grid: list[list[str]], caption: str) -> str:
     """Turn a rebuilt grid into one self-contained sentence per data row.
 
-    The dense markdown table embeds poorly (dominated by every model and number at once), so a
-    row stated as "<caption>. <row label>: <col> <value>, ..." gives retrieval a focused chunk
-    that matches a question about that one entity and metric.
+    A row stated as "<caption>. <row label>: <col> <value>, ..." embeds as a focused chunk,
+    unlike the dense table which mixes every model and number together.
     """
     header = grid[0]
     data = grid[1:]
     prefix = f"{caption} " if caption else ""
     width = len(header)
 
-    # The label column is the one with the most DISTINCT non-numeric cells (the model/system
-    # names). Counting distinct values (not just any text) avoids picking a constant category
-    # column ("Backend: FAISS, FAISS") over the discriminating one ("IndexFlatIP, IndexIVF").
+    # Label column = most DISTINCT non-numeric cells. Distinct, not just any text, avoids picking
+    # a constant column ("FAISS, FAISS") over the discriminating one ("IndexFlatIP, IndexIVF").
     def name_count(j: int) -> int:
         return len({row[j].strip() for row in data if j < len(row) and row[j].strip() and not _is_number_token(row[j])})
     name_col = max(range(width), key=name_count)
@@ -73,7 +71,7 @@ def _verbalize_grid(grid: list[list[str]], caption: str) -> str:
         return " ".join(dict.fromkeys(parts))  # dedupe while keeping order
 
     lines = []
-    # One fact per row: "<name>: <col> <value>, ..." (answers a single-cell lookup).
+    # One fact per row (answers a single-cell lookup).
     for row in data:
         label = row_label(row)
         pairs = [
@@ -83,8 +81,8 @@ def _verbalize_grid(grid: list[list[str]], caption: str) -> str:
         ]
         if label and pairs:
             lines.append(f"{prefix}{label}: " + ", ".join(pairs) + ".")
-    # One fact per metric column: "<col>: <name1> <v1>, <name2> <v2>, ..." (answers compare/argmax
-    # and puts two systems' value for one metric in a single chunk).
+    # One fact per metric column (answers compare/argmax: two systems' value for one metric
+    # in a single chunk).
     for j in range(1, width):
         col = header[j].strip()
         if not col or j == name_col:
@@ -102,8 +100,8 @@ def _verbalize_grid(grid: list[list[str]], caption: str) -> str:
 def _markdown_table_facts(text: str) -> list[str]:
     """Verbalize each GitHub-style Markdown table in `text` into one fact per row/column.
 
-    The nearest preceding heading is used as a caption, so a row like a latency table becomes a
-    self-contained, retrievable fact ("... IndexFlatIP: Query latency 4 ms.")."""
+    The nearest preceding heading is used as the caption.
+    """
     facts: list[str] = []
     lines = text.split("\n")
     heading = ""
