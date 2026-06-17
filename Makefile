@@ -1,7 +1,7 @@
 # Docker stack shortcuts.
 
-COMPOSE        = docker compose
-COMPOSE_OLLAMA = docker compose -f docker-compose.yml -f docker-compose.bundled.yml
+COMPOSE        = docker compose -f docker/docker-compose.yml
+COMPOSE_OLLAMA = docker compose -f docker/docker-compose.yml -f docker/docker-compose.bundled.yml
 
 .PHONY: up up-ollama down logs build
 

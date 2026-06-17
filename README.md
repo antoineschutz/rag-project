@@ -46,13 +46,13 @@ The stack (Qdrant + the API + the dashboard) runs with one command. The LLM is t
 ```bash
 ollama serve        # if not already running
 ollama pull phi3
-make up             # = docker compose up
+make up             # = docker compose -f docker/docker-compose.yml up
 ```
 
-**Bundled (self-contained).** Adds Ollama (and pulls `phi3`) inside the stack, so nothing on the host is required. Ideal on a Linux/GPU VM; on a Mac it is CPU-only and needs ~8 GB given to Docker (Settings -> Resources). On an NVIDIA host, uncomment the GPU block in `docker-compose.bundled.yml`.
+**Bundled (self-contained).** Adds Ollama (and pulls `phi3`) inside the stack, so nothing on the host is required. Ideal on a Linux/GPU VM; on a Mac it is CPU-only and needs ~8 GB given to Docker (Settings -> Resources). On an NVIDIA host, uncomment the GPU block in `docker/docker-compose.bundled.yml`.
 
 ```bash
-make up-ollama      # = docker compose -f docker-compose.yml -f docker-compose.bundled.yml up
+make up-ollama      # = docker compose -f docker/docker-compose.yml -f docker/docker-compose.bundled.yml up
 ```
 
 `make down` stops either stack (volumes are kept). The `make` targets are just shortcuts for the underlying `docker compose` commands shown in the comments.

@@ -13,7 +13,9 @@ tools/
 docs/
 mlruns/
 mlflow.db
+var/
 *.log
 .git/
 .gitignore
+docker/
 tests/

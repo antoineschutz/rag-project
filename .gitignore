@@ -10,6 +10,7 @@ tmp/
 .ipynb_checkpoints/
 tools/
 docs/
+var/
 mlruns/
 mlflow.db
 eval_results*/*.log

@@ -15,7 +15,8 @@ if [ -f .env ]; then
   set +a
 fi
 
-LOG="bench_overnight.log"
+mkdir -p var
+LOG="var/bench_overnight.log"
 
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   echo "OPENAI_API_KEY is not set; the 'gpt' preset and --judge will fail." | tee -a "$LOG"

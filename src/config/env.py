@@ -17,6 +17,12 @@ class RAGEnvConfig:
 
     DATA_PATH: str = "./data/"
     CACHE_DIR: str = "./cache/"
+    # MLflow tracking store (benchmark runs). Relative to the repo root (the CWD the CLI and
+    # dashboard run from). Overridable via MLFLOW_TRACKING_URI; the dashboard reader resolves
+    # the same default (dashboard/pages/3_Evaluate.py).
+    MLFLOW_TRACKING_URI: str = field(
+        default_factory=lambda: os.getenv("MLFLOW_TRACKING_URI", "sqlite:///var/mlflow.db")
+    )
     LLM_BACKEND: str = "ollama"
     OLLAMA_MODEL: str = "phi3"
     OPENAI_MODEL: str = "gpt-4o-mini"

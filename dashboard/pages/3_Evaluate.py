@@ -4,6 +4,8 @@ Results are read from whatever tracking store mlflow resolves (shown in the page
 which is the same store scripts/benchmark.py logs to. Set MLFLOW_TRACKING_URI to point elsewhere.
 """
 
+import os
+
 import altair as alt
 import mlflow
 import pandas as pd
@@ -13,6 +15,8 @@ from api_client import APIError, get_presets, post_evaluate
 
 # Must match src.evaluation.benchmark.EXPERIMENT_NAME.
 EXPERIMENT_NAME = "rag-benchmark"
+# Default must match src.config.env.MLFLOW_TRACKING_URI (the store benchmark.py writes to).
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///var/mlflow.db"))
 
 st.title("Evaluate")
 

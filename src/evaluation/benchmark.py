@@ -102,6 +102,7 @@ def run_benchmark(
 
 def log_to_mlflow(report: dict[str, Any]) -> None:
     """Log one benchmark run to MLflow: config as params, scores as metrics, full results as an artifact."""
+    mlflow.set_tracking_uri(env.MLFLOW_TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT_NAME)
     run_name = report["config_name"] + ("+src" if report.get("use_source") else "")
     with mlflow.start_run(run_name=run_name):

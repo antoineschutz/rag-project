@@ -1,6 +1,7 @@
 # Default stack: qdrant + API + dashboard, using the host's Ollama (via OLLAMA_HOST).
 #   make up         # this file
 #   make up-ollama  # also bundle Ollama in-container (adds docker-compose.bundled.yml)
+# Paths are relative to this file's dir (docker/); the build context is the repo root (..).
 
 services:
   qdrant:
@@ -11,7 +12,9 @@ services:
       - "6333:6333"
 
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     command: uvicorn src.api.server:app --host 0.0.0.0 --port 8000
     environment:
       QDRANT_URL: http://qdrant:6333
@@ -19,11 +22,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"   # resolve on Linux too
     env_file:
-      - .env   # optional OPENAI_API_KEY / GROQ_API_KEY
+      - ../.env   # optional OPENAI_API_KEY / GROQ_API_KEY
     volumes:
       - hf_cache:/root/.cache       # model downloads
       - app_cache:/app/cache        # embeddings / chunks / index
-      - ./data:/app/data            # corpus
+      - ../data:/app/data           # corpus
     depends_on:
       - qdrant
     healthcheck:
@@ -36,7 +39,9 @@ services:
       - "8000:8000"
 
   dashboard:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     command: streamlit run dashboard/Home.py --server.address 0.0.0.0 --server.port 8501
     environment:
       RAG_API_URL: http://api:8000
