@@ -100,10 +100,10 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 ---
 
-## V9: Production
+## V9: Production (done)
 
 **Theme:** production hardening and deployment.
 
 **Why:** W is intentionally last, packaging the complete project once everything else is settled so anyone can run it with a single command.
 
-- [ ] **W. Docker.** `Dockerfile` + `docker-compose.yml` bundling the app and Ollama. *(Medium: containers)*
+- [x] **W. Docker.** `Dockerfile` plus a default `docker-compose.yml` (API, Streamlit dashboard, Qdrant; LLM via the host's Ollama) and a `docker-compose.bundled.yml` override that adds in-container Ollama (phi3) for a fully self-contained / GPU-VM run. Models, embeddings, and the Qdrant collection persist in named volumes. *(Medium: containers)*

@@ -1,0 +1,38 @@
+# Override that bundles Ollama in-container (self-contained; best on a Linux/GPU VM).
+#   make up-ollama
+# On an NVIDIA-GPU host, uncomment the `deploy` block under `ollama`.
+
+services:
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    # GPU passthrough (NVIDIA host):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # One-shot: pull phi3, then exit.
+  ollama-pull:
+    image: ollama/ollama
+    depends_on:
+      - ollama
+    entrypoint: ["sh", "-c", "sleep 3 && OLLAMA_HOST=http://ollama:11434 ollama pull phi3"]
+    restart: "no"
+
+  api:
+    # Point the API at the bundled Ollama.
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - qdrant
+      - ollama
+
+volumes:
+  ollama_models:

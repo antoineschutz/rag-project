@@ -1,0 +1,19 @@
+# Mirror .gitignore: keep the build context small and never bake secrets, caches, or the venv.
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.env
+CLAUDE.md
+cache/
+tmp/
+.ipynb_checkpoints/
+tools/
+docs/
+mlruns/
+mlflow.db
+*.log
+.git/
+.gitignore
+tests/

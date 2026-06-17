@@ -2,7 +2,7 @@
 
 A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
 
-The pipeline is tuned for scientific and research PDFs (the working corpus is ML papers). The ingestion heuristics in particular target academic layouts: two-column reflow, booktabs and borderless numeric results tables, "Table N" captions, and scientific-notation repair. Plain prose, Markdown, text, and DOCX are handled generically, but other document types (invoices, contracts, brochures) will extract as readable text without the specialized table reconstruction and fact verbalization.
+The pipeline is tuned for scientific and research PDFs (the working corpus is ML papers); the ingestion heuristics target academic layouts like multi-column text and results tables. Other document types still extract as readable text.
 
 ## Architecture
 
@@ -32,6 +32,32 @@ ollama pull phi3
 
 # OpenAI backend: copy .env.example to .env and set OPENAI_API_KEY
 ```
+
+## Run with Docker
+
+The stack (Qdrant + the API + the dashboard) runs with one command. The LLM is treated as an external dependency the API points at via `OLLAMA_HOST`, so there are two modes:
+
+- Dashboard: http://localhost:8501
+- API docs: http://localhost:8000/docs
+- Qdrant: http://localhost:6333
+
+**Default (host Ollama).** The container talks to the Ollama running on your host. Best on a Mac, where Docker has no GPU access and a small VM, so in-container inference is slow and can run out of memory.
+
+```bash
+ollama serve        # if not already running
+ollama pull phi3
+make up             # = docker compose up
+```
+
+**Bundled (self-contained).** Adds Ollama (and pulls `phi3`) inside the stack, so nothing on the host is required. Ideal on a Linux/GPU VM; on a Mac it is CPU-only and needs ~8 GB given to Docker (Settings -> Resources). On an NVIDIA host, uncomment the GPU block in `docker-compose.bundled.yml`.
+
+```bash
+make up-ollama      # = docker compose -f docker-compose.yml -f docker-compose.bundled.yml up
+```
+
+`make down` stops either stack (volumes are kept). The `make` targets are just shortcuts for the underlying `docker compose` commands shown in the comments.
+
+The first boot downloads the embedder/reranker (and, in bundled mode, pulls `phi3`); everything caches in named volumes, so later starts are fast. No API keys are needed for the `phi3` path; copy `.env.example` to `.env` and fill it in to use the `gpt` or `groq` presets.
 
 ## Usage
 
