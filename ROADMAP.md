@@ -107,3 +107,13 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 **Why:** W is intentionally last, packaging the complete project once everything else is settled so anyone can run it with a single command.
 
 - [x] **W. Docker.** `Dockerfile` plus a default `docker/docker-compose.yml` (API, Streamlit dashboard, Qdrant; LLM via the host's Ollama) and a `docker/docker-compose.bundled.yml` override that adds in-container Ollama (phi3) for a fully self-contained / GPU-VM run. Models, embeddings, and the Qdrant collection persist in named volumes. *(Medium: containers)*
+
+---
+
+## Beyond V9: portfolio finishing (done)
+
+**Theme:** turn the finished pipeline into a presentable, externally-credible artifact.
+
+- [x] **Benchmarks.** A synthetic scaling sweep (`scripts/benchmark_scale.py`: numpy / faiss-flat / faiss-ivf / qdrant over N up to 500k, latency / memory / recall; random load test plus a structured-data run on GloVe for recall-at-scale) and a BEIR retrieval-quality eval (`scripts/benchmark_beir.py` on SciFact + NFCorpus: nDCG@k / Recall@100 / MRR via pytrec_eval). Both log to MLflow. *(Medium: evaluation, ANN, IR metrics)*
+- [x] **Cloud Run deploy.** The API and the Streamlit dashboard deployed as two Google Cloud Run services (image built by Cloud Build, in-process vector store, generation via the Groq free tier), scale-to-zero, a live public HTTPS demo. *(Medium: GCP, Cloud Run, containers)*
+- [x] **Repo hygiene.** CI (GitHub Actions, pytest on 3.11/3.12), MIT license, and a README with the live demo, benchmark results, and badges.

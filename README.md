@@ -1,8 +1,21 @@
 # RAG Pipeline for Scientific Papers
 
+[![CI](https://github.com/antoineschutz/rag-project/actions/workflows/ci.yml/badge.svg)](https://github.com/antoineschutz/rag-project/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+
 A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
 
 The pipeline is tuned for scientific and research PDFs (the working corpus is ML papers); the ingestion heuristics target academic layouts like multi-column text and results tables. Other document types still extract as readable text.
+
+## Live demo
+
+**[▶ Try the live dashboard](https://rag-dashboard-490577611602.europe-west9.run.app)** (the API + Streamlit UI, deployed on Google Cloud Run).
+
+It runs on the Groq free tier and scales to zero, so the **first request after a period of idle is a slow cold start** (~50 s: the container wakes, warms up, then answers); after that it is fast. Generation is hosted (no GPU); the vector index is in-process and built into the image.
+
+<!-- Demo GIF: record the deployed Query page answering a question, save to assets/demo.gif, then uncomment: -->
+<!-- ![demo](assets/demo.gif) -->
 
 ## Architecture
 
@@ -12,34 +25,38 @@ Data flows linearly through five stages:
 2. **Chunking**: sentence-aware splitting with tiktoken (`cl100k_base`), max 128 tokens / 50-token overlap. Tables are kept atomic (never split mid-row) and bundled with surrounding prose when they fit
 3. **Embedding**: `sentence-transformers`, model swappable via `--embed-model` (`all-MiniLM-L6-v2` default; `bge-*`, `e5-*` supported)
 4. **Retrieval**: dense (numpy cosine, FAISS, or Qdrant), BM25 lexical, or hybrid fusion. Optional cross-encoder re-ranking and HyDE query expansion on top, plus an optional source filter to restrict retrieval to chosen documents
-5. **Generation**: Ollama (local) or OpenAI, with a configurable context window (`num_ctx`)
+5. **Generation**: Ollama (local, default), OpenAI, or Groq (hosted, OpenAI-compatible, free tier), with a configurable context window (`num_ctx`)
 
 ## Setup
 
-**Requirements:** Python 3.10+, and either [Ollama](https://ollama.com) running locally or an OpenAI API key.
+**Requirements:** Python 3.11+, and one LLM backend: [Ollama](https://ollama.com) running locally (default, no key), a [Groq](https://console.groq.com) key (free, hosted, zero local setup), or an OpenAI key.
 
 ```bash
 git clone https://github.com/antoineschutz/rag-project.git
 cd rag-project
 
 python -m venv venv
-source venv/bin/activate 
+source venv/bin/activate
 
 pip install -r requirements.txt
 
 # Ollama backend (default)
 ollama pull phi3
 
-# OpenAI backend: copy .env.example to .env and set OPENAI_API_KEY
+# Or skip Ollama entirely: copy .env.example to .env and set GROQ_API_KEY (free), then use --backend groq
 ```
+
+(`requirements-eval.txt` is only needed to run the benchmarks below.)
 
 ## Run with Docker
 
-The stack (Qdrant + the API + the dashboard) runs with one command. The LLM is treated as an external dependency the API points at via `OLLAMA_HOST`, so there are two modes:
+The stack (Qdrant + the API + the dashboard) runs with one command. Once it is up:
 
 - Dashboard: http://localhost:8501
 - API docs: http://localhost:8000/docs
 - Qdrant: http://localhost:6333
+
+The LLM is an external dependency the API points at via `OLLAMA_HOST`, so there are two ways to provide it:
 
 **Default (host Ollama).** The container talks to the Ollama running on your host. Best on a Mac, where Docker has no GPU access and a small VM, so in-container inference is slow and can run out of memory.
 
@@ -57,7 +74,7 @@ make up-ollama      # = docker compose -f docker/docker-compose.yml -f docker/do
 
 `make down` stops either stack (volumes are kept). The `make` targets are just shortcuts for the underlying `docker compose` commands shown in the comments.
 
-The first boot downloads the embedder/reranker (and, in bundled mode, pulls `phi3`); everything caches in named volumes, so later starts are fast. No API keys are needed for the `phi3` path; copy `.env.example` to `.env` and fill it in to use the `gpt` or `llama3.1-8b` presets.
+The image bakes the default models and a prebuilt index so a cloud cold start needs no network. Locally the named volumes shadow those, so a fresh `make up` still downloads the embedder/reranker and embeds the corpus on first run, then caches in the volumes (later starts are fast). No API keys are needed for the `phi3` path; copy `.env.example` to `.env` and fill it in to use the `gpt` or `llama3.1-8b` presets.
 
 ## Usage
 
@@ -70,8 +87,9 @@ python main.py --query "What is the difference between RAG-Sequence and RAG-Toke
 # Skip retrieval: query the LLM directly with no context
 python main.py --query "..." --no-rag
 
-# OpenAI instead of Ollama (needs OPENAI_API_KEY)
+# Hosted backends: OpenAI (needs OPENAI_API_KEY) or Groq (needs GROQ_API_KEY, free tier)
 python main.py --query "..." --backend gpt
+python main.py --query "..." --backend groq
 
 # Retrieval method: BM25 lexical (no embeddings), or hybrid (dense + BM25 fused)
 python main.py --query "..." --retriever bm25
@@ -121,9 +139,9 @@ Interactive docs (Swagger UI) live at `http://127.0.0.1:8000/docs`. On startup t
 | endpoint | purpose |
 |----------|---------|
 | `GET /health` | liveness check |
-| `GET /presets` | list the named presets (`baseline`, `best`, `no-rag`) and their configs |
+| `GET /presets` | list the named presets (`baseline`, `best`, `gpt`, `llama3.1-8b`, and more) and their configs |
 | `GET /sources` | list the document filenames in the data dir, for the source filter |
-| `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides (including `store` and `source`), or omit `config` for the best preset |
+| `POST /query` | answer one question; returns the answer plus the retrieved chunks. Select the pipeline with a preset name, inline knob overrides (including `store` and `source`), or omit `config` for the best preset. `POST /query/stream` streams the tokens as NDJSON |
 | `POST /evaluate` | score a config over the keyword-graded QA set (`accuracy_29`, optional LLM judge). A known preset `name` wins; pass an inline `config` under a non-preset name to score a custom config |
 | `POST /compare` | run one query through two configs and return both answers and chunks side by side |
 
@@ -143,9 +161,11 @@ Four pages:
 - **Evaluate**: chart the benchmark runs logged in MLflow, or trigger a live evaluation over the QA set.
 - **Chat**: multi-turn conversation; follow-up questions are condensed into a standalone query against the history before retrieval.
 
-Set `RAG_API_URL` if the API runs somewhere other than `http://127.0.0.1:8000`.
+Set `RAG_API_URL` if the API runs somewhere other than `http://127.0.0.1:8000`. (The hosted demo sets `RAG_DEMO=1` to hide options it cannot serve, such as the `gpt` preset and the Evaluate page; locally everything is enabled.)
 
-## Results
+## Results and benchmarks
+
+### Answer quality (QA set)
 
 Benchmarked on 29 hand-written Q/A pairs (8 difficulty levels) over a corpus of real ML papers plus a few synthetic docs. `scripts/benchmark.py` scores every answer two ways: an exact-match keyword check (`accuracy_29`) and an LLM-as-judge (`gpt-4o-mini`). The goal is lifting a small local model (`phi3`) with retrieval; the hosted models (OpenAI, Groq) are ceiling probes.
 
@@ -159,6 +179,30 @@ Benchmarked on 29 hand-written Q/A pairs (8 difficulty levels) over a corpus of 
 | Llama-3.1-8B, no-RAG | 5/29 (17%) | 4/29 (14%) |
 | Llama-3.1-8B, RAG | 27/29 (93%) | 25/29 (86%) |
 
-Retrieval does the heavy lifting: RAG takes phi3 from 10% to 52% on the judge, and even the hosted models gain roughly 55 points with retrieval (they cannot answer this corpus from parametric knowledge alone). The judge is stricter than the keyword check (it catches substring false positives) but agrees on the ranking. The `gpt` preset and the judge are both gpt-4o-mini, so that row is self-graded.
+Retrieval does the heavy lifting: RAG takes phi3 from 10% to 52% on the judge, and even the hosted models gain roughly 55 points with retrieval (they cannot answer this corpus from parametric knowledge alone). The remaining gap between phi3+RAG (52%) and GPT/Llama+RAG (83-86%) is **model capacity, not retrieval**: the relevant passage is almost always retrieved in the top chunks, but phi3 is often too weak to extract the answer from it, where the larger models succeed on the exact same context.
 
 Reproduce: `python scripts/benchmark.py --config best --judge`, then `mlflow ui` to browse runs.
+
+### Retrieval quality (BEIR)
+
+The retrievers are also evaluated on [BEIR](https://github.com/beir-cellar/beir) (SciFact + NFCorpus) with standard IR metrics via `pytrec_eval` (`scripts/benchmark_beir.py`). nDCG@10:
+
+| config | SciFact | NFCorpus |
+|--------|--------:|---------:|
+| BM25 | 0.560 | 0.266 |
+| dense (MiniLM) | 0.645 | 0.316 |
+| **dense (bge-small)** | **0.720** | **0.337** |
+| hybrid (MiniLM + BM25, RRF) | 0.638 | 0.308 |
+| hybrid + cross-encoder rerank | 0.503 | 0.275 |
+
+Two honest findings: dense `MiniLM` reproduces the published BEIR numbers (a correctness check on the stack), and the off-the-shelf `ms-marco` cross-encoder reranker **hurts** on both datasets, a real out-of-domain effect (it is trained on short web passages, not scientific/medical documents).
+
+### Scaling
+
+`scripts/benchmark_scale.py` sweeps the vector-store backends over N up to 500k and measures latency, build time, memory, and recall vs. exact search. On uniform-random vectors it is a load test (recall is meaningless without structure); rerun with `--data glove-100-angular` for real structured vectors where recall is meaningful.
+
+![Vector-store scaling on random vectors (load test)](assets/scale_random.png)
+
+![Recall at scale on structured (GloVe) vectors](assets/scale_glove.png)
+
+Brute force (numpy) latency grows linearly and falls over; FAISS-IVF and Qdrant (HNSW) stay sub-linear. On random data ANN recall collapses (no structure to exploit), but on structured GloVe vectors the ANN backends hold high recall as N grows (FAISS-IVF ~0.82, Qdrant ~0.88 at 500k), confirming they behave correctly on realistic data.
