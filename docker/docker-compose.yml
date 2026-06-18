@@ -14,7 +14,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     command: uvicorn src.api.server:app --host 0.0.0.0 --port 8000
     environment:
       QDRANT_URL: http://qdrant:6333
@@ -41,7 +41,7 @@ services:
   dashboard:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     command: streamlit run dashboard/Home.py --server.address 0.0.0.0 --server.port 8501
     environment:
       RAG_API_URL: http://api:8000

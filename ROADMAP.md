@@ -106,4 +106,4 @@ A from-scratch RAG pipeline built incrementally. Each version groups a few atomi
 
 **Why:** W is intentionally last, packaging the complete project once everything else is settled so anyone can run it with a single command.
 
-- [x] **W. Docker.** `docker/Dockerfile` plus a default `docker/docker-compose.yml` (API, Streamlit dashboard, Qdrant; LLM via the host's Ollama) and a `docker/docker-compose.bundled.yml` override that adds in-container Ollama (phi3) for a fully self-contained / GPU-VM run. Models, embeddings, and the Qdrant collection persist in named volumes. *(Medium: containers)*
+- [x] **W. Docker.** `Dockerfile` plus a default `docker/docker-compose.yml` (API, Streamlit dashboard, Qdrant; LLM via the host's Ollama) and a `docker/docker-compose.bundled.yml` override that adds in-container Ollama (phi3) for a fully self-contained / GPU-VM run. Models, embeddings, and the Qdrant collection persist in named volumes. *(Medium: containers)*
