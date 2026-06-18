@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 class Reranker:
     """Cross-encoder re-ranker for two-stage retrieval."""
 
-    def __init__(self, model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2") -> None:
-        """Load the cross-encoder model."""
-        self.model = CrossEncoder(model)
+    def __init__(self, model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2", device: str | None = None) -> None:
+        """Load the cross-encoder model. device=None auto-selects (mps/cuda/cpu)."""
+        self.model = CrossEncoder(model, device=device)
         logger.info("Reranker loaded: %s", model)
 
     def rerank(
