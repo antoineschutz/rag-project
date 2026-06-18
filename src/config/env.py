@@ -23,7 +23,7 @@ class RAGEnvConfig:
     MLFLOW_TRACKING_URI: str = field(
         default_factory=lambda: os.getenv("MLFLOW_TRACKING_URI", "sqlite:///var/mlflow.db")
     )
-    LLM_BACKEND: str = "ollama"
+    LLM_BACKEND: str = field(default_factory=lambda: os.getenv("LLM_BACKEND", "ollama"))
     OLLAMA_MODEL: str = "phi3"
     OPENAI_MODEL: str = "gpt-4o-mini"
     # Groq serves open models behind an OpenAI-compatible API (fast, free tier); needs GROQ_API_KEY.
