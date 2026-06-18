@@ -1,4 +1,5 @@
 import re
+import statistics
 
 import pdfplumber
 
@@ -11,17 +12,57 @@ def _word_in_bbox(word: dict, bbox: tuple) -> bool:
     return x0 <= x_center <= x1 and top <= y_center <= bottom
 
 
+def _attach_word_sizes(words: list[dict], chars: list[dict]) -> None:
+    """Annotate each word in place with `size`, the median font size of the chars it covers.
+
+    Done from chars rather than `extract_words(extra_attrs=["size"])` because passing size as an
+    extra attr also makes it a word-grouping key, which splits mixed-size runs like "p(z|x)" into
+    separate tokens. _words_to_text needs the size only to spot subscripts, not to segment.
+    """
+    by_bucket: dict[int, list[dict]] = {}
+    for c in chars:
+        if c.get("size"):
+            by_bucket.setdefault(round(c["top"] / 3) * 3, []).append(c)
+    for w in words:
+        bucket = round(w["top"] / 3) * 3
+        covered = [
+            c["size"]
+            for b in (bucket - 3, bucket, bucket + 3)
+            for c in by_bucket.get(b, [])
+            if w["x0"] - 0.5 <= (c["x0"] + c["x1"]) / 2 <= w["x1"] + 0.5
+        ]
+        if covered:
+            w["size"] = statistics.median(covered)
+
+
 def _words_to_text(words: list[dict]) -> list[tuple[int, str]]:
     """Reconstruct (top_bucket, line_text) pairs from word dicts, sorted by top position.
 
     Words within a bucket are sorted by x0 so superscripts/descenders land in reading order.
+    Small-font subscripts (the BASE/LARGE in "BERT_BASE") sit a few points below their base
+    word and would otherwise bucket into a separate line, scrambling the x0 sort. They are
+    snapped up to the nearest normal-size baseline within a half-line window, which rejoins
+    them to their base word; the window keeps genuinely small lines (captions) untouched.
+    Words without a size attribute fall back to the plain top-bucket behaviour.
     """
     if not words:
         return []
+    sizes = [w["size"] for w in words if w.get("size")]
+    median_size = statistics.median(sizes) if sizes else 0.0
+    normal_tops = sorted(
+        w["top"] for w in words if not median_size or w.get("size", median_size) >= median_size * 0.85
+    )
+
+    def line_key(word: dict) -> int:
+        if median_size and word.get("size", median_size) < median_size * 0.85 and normal_tops:
+            nearest = min(normal_tops, key=lambda t: abs(t - word["top"]))
+            if abs(nearest - word["top"]) <= median_size * 0.6:
+                return round(nearest / 3) * 3
+        return round(word["top"] / 3) * 3
+
     lines: dict[int, list[dict]] = {}
     for w in words:
-        key = round(w["top"] / 3) * 3
-        lines.setdefault(key, []).append(w)
+        lines.setdefault(line_key(w), []).append(w)
     return [
         (k, " ".join(w["text"] for w in sorted(lines[k], key=lambda w: w["x0"])))
         for k in sorted(lines)

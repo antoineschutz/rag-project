@@ -4,6 +4,7 @@ import statistics
 import pdfplumber
 
 from src.ingestion.pdf_layout import (
+    _attach_word_sizes,
     _column_boundaries_from_words,
     _find_column_split,
     _find_footnote_top,
@@ -289,10 +290,13 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> tuple[str, list[str]]:
     footnote_top = _find_footnote_top(page)
 
     # Phase 2: body text (words outside table regions and above footnote zone)
+    # Drop non-upright words: rotated text is the vertical arXiv margin stamp and small-caps
+    # tokens (e.g. [CLS]) that pdfplumber otherwise interleaves into body words by coordinate.
     all_words = page.extract_words(x_tolerance=1)
     body_words = [
         w for w in all_words
-        if not any(_word_in_bbox(w, bb) for bb in table_bboxes)
+        if w.get("upright", True)
+        and not any(_word_in_bbox(w, bb) for bb in table_bboxes)
         and w["top"] < footnote_top
     ]
 
@@ -306,6 +310,7 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> tuple[str, list[str]]:
         body_words = [w for w in body_words if id(w) not in consumed_ids]
 
     if body_words:
+        _attach_word_sizes(body_words, page.chars)
         split_x = _find_column_split(body_words, page.width)
         two_column = split_x is not None
 
@@ -327,7 +332,8 @@ def _extract_page_text(page: pdfplumber.pdf.Page) -> tuple[str, list[str]]:
         # Phase 3: header labelling, match chars by y-position bucket not text substring
         non_table_chars = [
             c for c in page.chars
-            if not any(_word_in_bbox(c, bb) for bb in table_bboxes)
+            if c.get("upright", True)
+            and not any(_word_in_bbox(c, bb) for bb in table_bboxes)
             and c["top"] < footnote_top
         ]
         if non_table_chars:

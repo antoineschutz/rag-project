@@ -1,12 +1,10 @@
-# RAG Pipeline for Scientific Papers
+# RAG Pipeline for Academic PDFs
 
 [![CI](https://github.com/antoineschutz/rag-project/actions/workflows/ci.yml/badge.svg)](https://github.com/antoineschutz/rag-project/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 
-A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. Built incrementally to understand each component of the RAG stack.
-
-The pipeline is tuned for scientific and research PDFs (the working corpus is ML papers); the ingestion heuristics target academic layouts like multi-column text and results tables. Other document types still extract as readable text.
+A from-scratch RAG (Retrieval-Augmented Generation) pipeline: no LangChain, no LlamaIndex. The ingestion is built for academic-PDF layout: two-column reading order, results tables as Markdown, and footnotes. Markdown, text, and DOCX files extract as readable text too.
 
 ## Live demo
 
@@ -14,8 +12,7 @@ The pipeline is tuned for scientific and research PDFs (the working corpus is ML
 
 It runs on the Groq free tier and scales to zero, so the **first request after a period of idle is a slow cold start** (~50 s: the container wakes, warms up, then answers); after that it is fast. Generation is hosted (no GPU); the vector index is in-process and built into the image.
 
-<!-- Demo GIF: record the deployed Query page answering a question, save to assets/demo.gif, then uncomment: -->
-<!-- ![demo](assets/demo.gif) -->
+![Demo: without retrieval the model declines a benchmark-table question; with RAG it answers from the paper](assets/demo.gif)
 
 ## Architecture
 
