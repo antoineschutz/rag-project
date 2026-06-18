@@ -18,6 +18,11 @@ st.write(
 
 if health():
     st.success(f"API connected at {API_URL}")
+elif demo_mode():
+    st.info(
+        "The demo API is idle (Cloud Run scales to zero when unused). Open the **Query** page "
+        "and ask a question: the first request wakes it (~50s cold start), then it is fast."
+    )
 else:
     st.error(
         f"API not reachable at {API_URL}. Start it in another terminal:\n\n"
