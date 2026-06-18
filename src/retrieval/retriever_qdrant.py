@@ -47,17 +47,21 @@ class RetrieverQdrant:
         self.client.create_collection(
             collection, vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
         )
-        self.client.upsert(
-            collection,
-            points=[
-                PointStruct(
-                    id=i,
-                    vector=doc_embeddings[i].tolist(),
-                    payload={"text": doc["text"], "source": doc["source"]},
-                )
-                for i, doc in enumerate(chunked_docs)
-            ],
-        )
+        # Upsert in batches: a single request for the whole corpus exceeds Qdrant's payload
+        # limit (~32 MB) at a few tens of thousands of vectors.
+        batch_size = 1000
+        for start in range(0, len(chunked_docs), batch_size):
+            self.client.upsert(
+                collection,
+                points=[
+                    PointStruct(
+                        id=i,
+                        vector=doc_embeddings[i].tolist(),
+                        payload={"text": chunked_docs[i]["text"], "source": chunked_docs[i]["source"]},
+                    )
+                    for i in range(start, min(start + batch_size, len(chunked_docs)))
+                ],
+            )
 
     @classmethod
     def from_collection(

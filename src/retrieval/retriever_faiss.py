@@ -14,6 +14,11 @@ from src.utils.cache import cache_paths
 
 logger = logging.getLogger(__name__)
 
+# Cells probed per IVF query. Held fixed (the standard practice: tune nprobe to a recall target,
+# not to nlist) so that with nlist ~ sqrt(N) the search cost stays ~sqrt(N) sublinear. A value
+# that scales with nlist (e.g. nlist//10) would make IVF scan ~N/10 points, i.e. linear.
+IVF_NPROBE = 16
+
 
 class RetrieverFAISS:
     def __init__(
@@ -22,11 +27,13 @@ class RetrieverFAISS:
         doc_embeddings: np.ndarray,
         index_type: str = "flat",
         embedder: Embedder | None = None,
+        nprobe: int = IVF_NPROBE,
     ) -> None:
         """Build a FAISS index (flat or IVF) from chunk embeddings and store the docs.
 
         The embedder embeds the query string at retrieve time; optional so callers with
-        raw query vectors (e.g. tests) can use _retrieve_vec.
+        raw query vectors (e.g. tests) can use _retrieve_vec. nprobe (IVF only) is the fixed
+        number of cells searched per query.
         """
         self.docs = chunked_docs
         self.embedder = embedder
@@ -39,7 +46,7 @@ class RetrieverFAISS:
             quantizer = faiss.IndexFlatIP(dim)
             self.index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
             self.index.train(vectors)
-            self.index.nprobe = max(1, nlist // 10)
+            self.index.nprobe = min(nprobe, nlist)
         else:  # flat
             self.index = faiss.IndexFlatIP(dim)
 
