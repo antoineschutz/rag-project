@@ -240,6 +240,11 @@ def make_chart(rows: list[dict[str, Any]], out_dir: str) -> str:
 
     os.makedirs(out_dir, exist_ok=True)
     backends = sorted({r["backend"] for r in rows})
+    sizes = sorted({r["n"] for r in rows})  # tick at the actual N values (e.g. 500k, not 10^6)
+
+    def _human(n: int) -> str:
+        return f"{n // 1_000_000}M" if n >= 1_000_000 else f"{n // 1000}k"
+
     panels = [
         ("latency_p50_ms", "query latency p50 (ms)", True),
         ("recall_at_k", "recall@k vs exact", False),
@@ -258,6 +263,9 @@ def make_chart(rows: list[dict[str, Any]], out_dir: str) -> str:
         if log_y:
             ax.set_yscale("log")
         ax.set_xlabel("N (vectors)")
+        ax.set_xticks(sizes)
+        ax.set_xticklabels([_human(n) for n in sizes])
+        ax.minorticks_off()  # drop the log minor ticks so only the swept sizes are labeled
         ax.set_title(label)
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=8)
