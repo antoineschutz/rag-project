@@ -3,7 +3,7 @@
 COMPOSE        = docker compose -f docker/docker-compose.yml
 COMPOSE_OLLAMA = docker compose -f docker/docker-compose.yml -f docker/docker-compose.bundled.yml
 
-.PHONY: up up-ollama down logs build
+.PHONY: up up-ollama down logs build bench-scale
 
 up:               # host Ollama
 	$(COMPOSE) up
@@ -19,3 +19,6 @@ logs:
 
 build:
 	$(COMPOSE) build
+
+bench-scale:      # synthetic vector-store scaling sweep -> var/scale/scale.png
+	python scripts/benchmark_scale.py
