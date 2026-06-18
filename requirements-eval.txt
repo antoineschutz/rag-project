@@ -1,0 +1,5 @@
+# Eval-only dependency for the BEIR retrieval benchmark (scripts/benchmark_beir.py).
+# Not needed to run the app, API, or dashboard (kept out of requirements.txt and CI).
+# If pytrec_eval fails to build from source, install the prebuilt wheel instead
+# (same `import pytrec_eval`):  pip install pytrec-eval-terrier
+pytrec_eval==0.5
