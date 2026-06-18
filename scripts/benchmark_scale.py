@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.evaluation.scale import (
+    ANN_DATASETS,
     BACKENDS,
     EXPERIMENT_NAME,
     log_scale_run,
@@ -30,7 +31,10 @@ from src.evaluation.scale import (
 
 def _run_worker(args: argparse.Namespace) -> None:
     """Internal mode: measure one cell and print it as a JSON line."""
-    cell = measure_cell(args.backend, args.size, args.dim, args.queries, args.top_k, args.seed)
+    cell = measure_cell(
+        args.backend, args.size, args.dim, args.queries, args.top_k, args.seed,
+        data=args.data, data_dir=args.data_dir,
+    )
     print(json.dumps(cell))
 
 
@@ -57,6 +61,7 @@ def _run_sweep(args: argparse.Namespace) -> None:
                 "--backend", backend, "--size", str(n),
                 "--dim", str(args.dim), "--queries", str(args.queries),
                 "--top-k", str(args.top_k), "--seed", str(args.seed),
+                "--data", args.data, "--data-dir", args.data_dir,
             ]
             proc = subprocess.run(cmd, capture_output=True, text=True, env=worker_env)
             if proc.returncode != 0:
@@ -88,7 +93,12 @@ def main() -> None:
                    help="Backends to sweep (default: all four)")
     p.add_argument("--sizes", nargs="+", type=int, default=[1000, 5000, 20000, 100000],
                    help="Vector counts to sweep (default fits a laptop; big N is slower/heavier)")
-    p.add_argument("--dim", type=int, default=384, help="Embedding dimension (384 = all-MiniLM)")
+    p.add_argument("--dim", type=int, default=384,
+                   help="Embedding dimension for --data random (ignored for an ann dataset)")
+    p.add_argument("--data", default="random", choices=["random", *ANN_DATASETS],
+                   help="random (load test, recall meaningless) or an ann-benchmarks dataset "
+                        "(real structured vectors -> recall is charted)")
+    p.add_argument("--data-dir", default="var/ann", help="Cache dir for downloaded ann datasets")
     p.add_argument("--queries", type=int, default=100, help="Query vectors for latency/recall")
     p.add_argument("--top-k", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)

@@ -1,5 +1,9 @@
-# Eval-only dependency for the BEIR retrieval benchmark (scripts/benchmark_beir.py).
-# Not needed to run the app, API, or dashboard (kept out of requirements.txt and CI).
-# If pytrec_eval fails to build from source, install the prebuilt wheel instead
-# (same `import pytrec_eval`):  pip install pytrec-eval-terrier
+# Eval-only dependencies for the benchmarks. Not needed to run the app, API, or dashboard
+# (kept out of requirements.txt and CI).
+
+# BEIR retrieval-quality benchmark (scripts/benchmark_beir.py). If pytrec_eval fails to build
+# from source, install the prebuilt wheel instead (same `import pytrec_eval`): pytrec-eval-terrier
 pytrec_eval==0.5
+
+# Loads ann-benchmarks HDF5 datasets (glove-100-angular) for `benchmark_scale.py --data ...`.
+h5py==3.16.0

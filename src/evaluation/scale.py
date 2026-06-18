@@ -1,10 +1,13 @@
-"""Synthetic scaling benchmark for the dense backends.
+"""Scaling benchmark for the dense backends.
 
-Sweeps numpy cosine, FAISS flat, FAISS IVF, and Qdrant over N random vectors and measures
-index build time, memory, query latency (p50/p95), and recall@k vs exact brute force. The
-retrievers are constructed directly from a raw embeddings matrix (not via build_index, which
-is bound to the on-disk corpus) so N can be set freely. See scripts/benchmark_scale.py for the
-CLI that runs each (backend, N) cell in its own subprocess.
+Sweeps numpy cosine, FAISS flat, FAISS IVF, and Qdrant over N vectors and measures index build
+time, memory, query latency (p50/p95), and recall@k vs exact brute force. The retrievers are
+constructed directly from a raw embeddings matrix (not via build_index, which is bound to the
+on-disk corpus) so N can be set freely. See scripts/benchmark_scale.py for the CLI that runs each
+(backend, N) cell in its own subprocess.
+
+Two data modes: 'random' uniform vectors (a load test, where recall is meaningless) and an
+ann-benchmarks dataset such as glove-100-angular (real structured vectors, where recall is real).
 
 The qdrant backend requires a running Qdrant server (QDRANT_URL): only the server uses the HNSW
 engine, while the in-process ':memory:' client does brute-force search and would not measure
@@ -15,6 +18,7 @@ import json
 import logging
 import os
 import time
+import urllib.request
 from typing import Any, Callable
 
 import numpy as np
@@ -25,14 +29,48 @@ EXPERIMENT_NAME = "rag-scale"
 BACKENDS = ("numpy", "faiss-flat", "faiss-ivf", "qdrant")
 SCALE_COLLECTION = "scale_bench"  # recreated each qdrant cell (RetrieverQdrant drops + recreates)
 
+# Real structured vectors for the recall-at-scale story (ann-benchmarks). Angular = cosine,
+# matching the retrievers; ground truth is computed in-house (the bundled GT is for the full 1M).
+ANN_URL = "http://ann-benchmarks.com/{name}.hdf5"
+ANN_DATASETS = ("glove-100-angular",)
 
-def _make_vectors(n: int, dim: int, seed: int) -> np.ndarray:
-    """Return n L2-normalized random float32 vectors (so inner product equals cosine)."""
-    rng = np.random.default_rng(seed)
-    vecs = rng.standard_normal((n, dim)).astype("float32")
+
+def _normalize(vecs: np.ndarray) -> np.ndarray:
+    """L2-normalize rows so inner product equals cosine (safe on zero vectors)."""
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
-    return vecs / norms
+    return (vecs / norms).astype("float32")
+
+
+def _make_vectors(n: int, dim: int, seed: int) -> np.ndarray:
+    """Return n L2-normalized random float32 vectors."""
+    rng = np.random.default_rng(seed)
+    return _normalize(rng.standard_normal((n, dim)).astype("float32"))
+
+
+def download_ann_dataset(name: str, data_dir: str = "var/ann") -> str:
+    """Download an ann-benchmarks HDF5 dataset (cached). Returns the file path."""
+    path = os.path.join(data_dir, f"{name}.hdf5")
+    if os.path.exists(path):
+        return path
+    os.makedirs(data_dir, exist_ok=True)
+    logger.info("downloading ann-benchmarks/%s ...", name)
+    urllib.request.urlretrieve(ANN_URL.format(name=name), path)
+    return path
+
+
+def _load_vectors(
+    data: str, n: int, dim: int, queries: int, seed: int, data_dir: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (base[<=n], query[<=queries]) L2-normalized. 'random' generates; else an ann dataset."""
+    if data == "random":
+        return _make_vectors(n, dim, seed), _make_vectors(queries, dim, seed + 1)
+    import h5py
+
+    with h5py.File(download_ann_dataset(data, data_dir), "r") as f:
+        base = _normalize(np.asarray(f["train"][:n], dtype="float32"))
+        query = _normalize(np.asarray(f["test"][:queries], dtype="float32"))
+    return base, query
 
 
 def _make_docs(n: int) -> list[dict[str, str]]:
@@ -108,18 +146,24 @@ def _exact_topk(embeddings: np.ndarray, query_vecs: np.ndarray, top_k: int) -> l
 
 
 def measure_cell(
-    backend: str, n: int, dim: int, queries: int, top_k: int, seed: int
+    backend: str, n: int, dim: int, queries: int, top_k: int, seed: int,
+    data: str = "random", data_dir: str = "var/ann",
 ) -> dict[str, Any]:
-    """Build one backend over N synthetic vectors and measure build/memory/latency/recall."""
+    """Build one backend over N vectors and measure build/memory/latency/recall.
+
+    data='random' generates uniform vectors (recall is meaningless, a load test); an
+    ann-benchmarks name (e.g. glove-100-angular) loads real structured vectors so recall is real.
+    """
     import psutil
 
     make = _resolve_backend(backend)  # import deps before the memory baseline
     proc = psutil.Process()
 
     rss_baseline = proc.memory_info().rss
-    embeddings = _make_vectors(n, dim, seed)
+    embeddings, query_vecs = _load_vectors(data, n, dim, queries, seed, data_dir)
+    n, dim = int(embeddings.shape[0]), int(embeddings.shape[1])  # actual sizes from the data
+    queries = len(query_vecs)
     docs = _make_docs(n)
-    query_vecs = _make_vectors(queries, dim, seed + 1)
 
     t0 = time.perf_counter()
     retriever = make(embeddings, docs)
@@ -148,6 +192,7 @@ def measure_cell(
     nprobe = int(retriever.index.nprobe) if backend == "faiss-ivf" else None
     return {
         "backend": backend,
+        "data": data,
         "n": n,
         "dim": dim,
         "top_k": top_k,
@@ -171,15 +216,21 @@ def log_scale_run(cell: dict[str, Any]) -> None:
     mlflow.set_tracking_uri(env.MLFLOW_TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name=f"{cell['backend']}-N{cell['n']}"):
-        for k in ("backend", "n", "dim", "top_k", "queries", "seed", "nprobe"):
-            mlflow.log_param(k, cell[k])
+        for k in ("backend", "data", "n", "dim", "top_k", "queries", "seed", "nprobe"):
+            mlflow.log_param(k, cell.get(k))
         for k in ("build_time_s", "mem_rss_mb", "latency_p50_ms", "latency_p95_ms", "recall_at_k"):
             if cell[k] is not None:  # qdrant memory is server-side, not measured here
                 mlflow.log_metric(k, cell[k])
 
 
 def make_chart(rows: list[dict[str, Any]], out_dir: str) -> str:
-    """Render the 2x2 scaling chart and dump the raw rows. Returns the PNG path."""
+    """Render the 2x2 scaling chart and dump the raw rows. Returns the PNG path.
+
+    The recall@k panel is always drawn. On random vectors it is a no-structure baseline (ANN
+    recall collapses as N grows, expected); on a structured ann dataset it is real retrieval
+    recall (ANN holds up). Comparing the two runs shows recall is entirely data-dependent.
+    (p95 latency is omitted from the chart but kept in the JSON / MLflow.)
+    """
     import os
 
     import matplotlib
@@ -189,11 +240,9 @@ def make_chart(rows: list[dict[str, Any]], out_dir: str) -> str:
 
     os.makedirs(out_dir, exist_ok=True)
     backends = sorted({r["backend"] for r in rows})
-    # Recall is measured and logged but intentionally not charted: on random vectors it reflects
-    # exact-rank reproduction on adversarial data, not retrieval quality (that is the BEIR job).
     panels = [
         ("latency_p50_ms", "query latency p50 (ms)", True),
-        ("latency_p95_ms", "query latency p95 (ms)", True),
+        ("recall_at_k", "recall@k vs exact", False),
         ("mem_rss_mb", "memory (MB)", True),
         ("build_time_s", "index build time (s)", True),
     ]
@@ -212,7 +261,8 @@ def make_chart(rows: list[dict[str, Any]], out_dir: str) -> str:
         ax.set_title(label)
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=8)
-    fig.suptitle("Dense backend scaling (synthetic vectors)")
+    data_label = sorted({r.get("data", "random") for r in rows})
+    fig.suptitle(f"Dense backend scaling ({', '.join(data_label)})")
     fig.tight_layout()
     png = os.path.join(out_dir, "scale.png")
     fig.savefig(png, dpi=120)
