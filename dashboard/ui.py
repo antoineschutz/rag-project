@@ -4,6 +4,8 @@ from typing import Any
 
 import streamlit as st
 
+from api_client import demo_mode
+
 
 def render_hyde_doc(doc: str | None) -> None:
     """Show the HyDE hypothetical passage (the text embedded for retrieval) when present."""
@@ -49,7 +51,9 @@ def config_selector(
             index=names.index("best") if "best" in names else 0, key=f"{key}_preset",
         )
 
-    backend = st.selectbox("backend", ["ollama", "gpt", "groq"], key=f"{key}_backend")
+    # The hosted demo only has groq (ollama/gpt need a local server / OpenAI key it doesn't have).
+    backends = ["groq"] if demo_mode() else ["ollama", "gpt", "groq"]
+    backend = st.selectbox("backend", backends, key=f"{key}_backend")
     if backend == "gpt":
         st.caption("gpt needs OPENAI_API_KEY set on the server.")
     elif backend == "groq":

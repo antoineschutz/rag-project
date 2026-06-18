@@ -6,7 +6,7 @@ the pages under dashboard/pages/ and lists them in the sidebar.
 
 import streamlit as st
 
-from api_client import API_URL, health
+from api_client import API_URL, demo_mode, health
 
 st.set_page_config(page_title="RAG pipeline", page_icon="🔎", layout="wide")
 
@@ -35,9 +35,15 @@ st.markdown(
 )
 
 st.divider()
-st.caption("Run both processes:")
-st.code(
-    "uvicorn src.api.server:app --reload   # terminal 1\n"
-    "streamlit run dashboard/Home.py       # terminal 2",
-    language="bash",
-)
+if demo_mode():
+    st.caption(
+        "Hosted demo on Google Cloud Run (Groq free-tier, scales to zero, so the first request "
+        "after idle is a slow cold start). Source: https://github.com/antoineschutz/rag-project"
+    )
+else:
+    st.caption("Run both processes:")
+    st.code(
+        "uvicorn src.api.server:app --reload   # terminal 1\n"
+        "streamlit run dashboard/Home.py       # terminal 2",
+        language="bash",
+    )

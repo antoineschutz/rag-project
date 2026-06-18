@@ -14,6 +14,12 @@ import requests
 
 API_URL = os.environ.get("RAG_API_URL", "http://127.0.0.1:8000").rstrip("/")
 
+
+def demo_mode() -> bool:
+    """True for the public hosted demo (RAG_DEMO set), which trims options that need keys/services
+    not available there (gpt/ollama, the Evaluate page). Unset locally, so local is unaffected."""
+    return os.environ.get("RAG_DEMO", "").lower() in ("1", "true", "yes")
+
 # /health and /presets are quick; a single /query runs the LLM (and maybe reranking), so it
 # needs a generous timeout; /compare runs two; /evaluate covers the whole question set.
 DEFAULT_TIMEOUT = 30.0
@@ -58,12 +64,17 @@ def health() -> bool:
 
 # The dashboard exposes a curated subset of the server's presets (the rest are eval-only).
 DASHBOARD_PRESETS = ("baseline", "best", "gpt", "llama3.1-8b")
+_DEMO_HIDDEN_PRESETS = ("gpt",)  # needs OPENAI_API_KEY, not set on the hosted demo
 
 
 def get_presets() -> dict[str, dict[str, Any]]:
     """Return the dashboard's curated presets (name -> flat config dict) from /presets."""
     all_presets = _request("GET", "/presets")
-    return {name: all_presets[name] for name in DASHBOARD_PRESETS if name in all_presets}
+    wanted = [
+        name for name in DASHBOARD_PRESETS
+        if not (demo_mode() and name in _DEMO_HIDDEN_PRESETS)
+    ]
+    return {name: all_presets[name] for name in wanted if name in all_presets}
 
 
 def get_sources() -> list[str]:

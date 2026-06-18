@@ -11,7 +11,7 @@ import mlflow
 import pandas as pd
 import streamlit as st
 
-from api_client import APIError, get_presets, post_evaluate
+from api_client import APIError, demo_mode, get_presets, post_evaluate
 
 # Must match src.evaluation.benchmark.EXPERIMENT_NAME.
 EXPERIMENT_NAME = "rag-benchmark"
@@ -19,6 +19,14 @@ EXPERIMENT_NAME = "rag-benchmark"
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///var/mlflow.db"))
 
 st.title("Evaluate")
+
+if demo_mode():
+    st.info(
+        "Evaluation isn't available in the hosted demo: there's no MLflow store in the image, and "
+        "a live run makes ~29 slow LLM calls (and the judge needs an OpenAI key). Clone the repo "
+        "and run it locally:\n\n```\npython scripts/benchmark.py --config best\n```"
+    )
+    st.stop()
 
 # --- Existing results -------------------------------------------------------------------
 st.subheader("Benchmark results")
