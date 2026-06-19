@@ -58,17 +58,15 @@ The LLM is an external dependency the API points at via `OLLAMA_HOST`, so there 
 **Default (host Ollama).** The container talks to the Ollama running on your host. Best on a Mac, where Docker has no GPU access and a small VM, so in-container inference is slow and can run out of memory.
 
 ```bash
-touch .env                  # create (can be empty; holds optional API keys)
-ollama serve               # if not already running
+ollama serve        # if not already running
 ollama pull phi3
-make up                    # = docker compose -f docker/docker-compose.yml up
+make up             # = docker compose -f docker/docker-compose.yml up
 ```
 
 **Bundled (self-contained).** Adds Ollama (and pulls `phi3`) inside the stack, so nothing on the host is required. Ideal on a Linux/GPU VM; on a Mac it is CPU-only and needs ~8 GB given to Docker (Settings -> Resources). On an NVIDIA host, uncomment the GPU block in `docker/docker-compose.bundled.yml`.
 
 ```bash
-touch .env                 # create (can be empty; holds optional API keys)
-make up-ollama             # = docker compose -f docker/docker-compose.yml -f docker/docker-compose.bundled.yml up
+make up-ollama      # = docker compose -f docker/docker-compose.yml -f docker/docker-compose.bundled.yml up
 ```
 
 `make down` stops either stack (volumes are kept). The `make` targets are just shortcuts for the underlying `docker compose` commands shown in the comments.

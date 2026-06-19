@@ -5,19 +5,23 @@ COMPOSE_OLLAMA = docker compose -f docker/docker-compose.yml -f docker/docker-co
 
 .PHONY: up up-ollama down logs build bench-scale bench-beir
 
-up:               # host Ollama
+# docker-compose references ../.env; create an empty one if missing so a fresh clone just works.
+.env:
+	touch .env
+
+up: .env          # host Ollama
 	$(COMPOSE) up
 
-up-ollama:        # bundled Ollama (self-contained)
+up-ollama: .env   # bundled Ollama (self-contained)
 	$(COMPOSE_OLLAMA) up
 
-down:             # stop all; keep volumes
+down: .env        # stop all; keep volumes
 	$(COMPOSE_OLLAMA) down
 
-logs:
+logs: .env
 	$(COMPOSE) logs -f
 
-build:
+build: .env
 	$(COMPOSE) build
 
 bench-scale:      # synthetic vector-store scaling sweep -> var/scale/scale.png
